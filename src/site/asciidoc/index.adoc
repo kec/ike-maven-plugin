@@ -1,0 +1,55 @@
+= IKE Tooling
+:icons: font
+
+Workspace management, release orchestration, gitflow workflows,
+and build-time utilities for IKE Community projects.
+
+== Modules
+
+[cols="1,3",options="header"]
+|===
+| Module | Description
+
+| link:ike-maven-plugin/index.html[IKE Maven Plugin]
+| 26 Maven goals for workspace management, release orchestration,
+  gitflow workflows, site deployment, and build utilities.
+
+| link:ike-workspace-model/index.html[IKE Workspace Model]
+| Typed Java model for `workspace.yaml` manifests with graph
+  algorithms (topological sort, cascade analysis, cycle detection)
+  and version manipulation utilities.
+|===
+
+== Quick Start
+
+[source,bash]
+----
+# Workspace status
+mvn ike:dashboard
+
+# Release
+mvn ike:release
+
+# Feature branch workflow
+mvn ike:feature-start -Dfeature=my-feature
+mvn ike:feature-finish -Dfeature=my-feature
+
+# Site deployment
+mvn ike:deploy-site -DsiteType=snapshot
+----
+
+== Resources
+
+[cols="1,3",options="header"]
+|===
+| Resource | URL
+
+| GitHub
+| https://github.com/kec/ike-tooling
+
+| Nexus Artifacts
+| https://nexus.tinkar.org
+
+| IKE Community
+| https://ike.network
+|===
