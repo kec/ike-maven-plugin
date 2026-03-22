@@ -27,7 +27,7 @@
         Workspace management, release orchestration, gitflow workflows,
         and build-time utilities for IKE Community projects.
     </description>
-    <url>https://github.com/kec/ike-maven-plugin</url>
+    <url>https://github.com/kec/ike-tooling</url>
     <inceptionYear>2026</inceptionYear>
 
     <licenses>
