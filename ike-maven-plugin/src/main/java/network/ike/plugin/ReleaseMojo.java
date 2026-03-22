@@ -279,27 +279,28 @@ public class ReleaseMojo extends AbstractMojo {
 
                 getLog().info("Deploying site to staging...");
                 ReleaseSupport.cleanRemoteSiteDir(gitRoot, getLog(), stagingDisk);
-                // Run verify first so JaCoCo coverage data is generated.
-                // The tag checkout wiped target/, so jacoco.exec must be
-                // recreated for the coverage report to appear in the site.
+                // 1. Run verify so JaCoCo coverage data is generated.
+                //    The tag checkout wiped target/, so jacoco.exec must
+                //    be recreated for the coverage report.
                 ReleaseSupport.exec(gitRoot, getLog(),
                         mvnw.getAbsolutePath(), "verify", "-B", "-T", "1");
 
-                // Inject breadcrumbs and theme into JaCoCo HTML reports.
-                // This must run after verify (which generates jacoco HTML)
-                // but before site:stage (which packages the site).
-                // Uses ike:inject-breadcrumb on each submodule that has
-                // JaCoCo output.
+                // 2. Build site (generates JaCoCo HTML from jacoco.exec).
+                //    -T 1: maven-site-plugin is not @ThreadSafe.
+                ReleaseSupport.exec(gitRoot, getLog(),
+                        mvnw.getAbsolutePath(), "site", "-B", "-T", "1");
+
+                // 3. Inject breadcrumbs and theme into JaCoCo HTML.
+                //    Must run AFTER site (which generates fresh HTML)
+                //    but BEFORE site:stage (which packages for deploy).
                 getLog().info("Injecting breadcrumbs into JaCoCo reports...");
                 ReleaseSupport.exec(gitRoot, getLog(),
                         mvnw.getAbsolutePath(), "ike:inject-breadcrumb",
                         "-B", "-T", "1");
 
-                // Build site and deploy to staging.
-                // -T 1: maven-site-plugin is not @ThreadSafe; sequential
-                // execution avoids spurious warnings in parallel sessions.
+                // 4. Stage and deploy the site (with injected breadcrumbs).
                 ReleaseSupport.exec(gitRoot, getLog(),
-                        mvnw.getAbsolutePath(), "site", "site:stage",
+                        mvnw.getAbsolutePath(), "site:stage",
                         "site:deploy", "-B", "-T", "1",
                         "-Dsite.deploy.url=" + stagingUrl);
                 ReleaseSupport.swapRemoteSiteDir(gitRoot, getLog(), releaseDisk);
