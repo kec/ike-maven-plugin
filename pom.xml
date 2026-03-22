@@ -19,7 +19,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-tooling</artifactId>
-    <version>28-SNAPSHOT</version>
+    <version>28</version>
     <packaging>pom</packaging>
 
     <name>IKE Tooling</name>
@@ -121,7 +121,7 @@
                 <plugin>
                     <groupId>network.ike</groupId>
                     <artifactId>ike-maven-plugin</artifactId>
-                    <version>${project.version}</version>
+                    <version>28</version>
                 </plugin>
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
