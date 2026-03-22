@@ -174,7 +174,7 @@ public class ReleaseMojo extends AbstractMojo {
         // artifacts in the local repo for sibling resolution.
         if (!skipVerify) {
             ReleaseSupport.exec(gitRoot, getLog(),
-                    mvnw.getAbsolutePath(), "clean", "install", "-B");
+                    mvnw.getAbsolutePath(), "clean", "install", "-B", "-T", "1");
         } else {
             getLog().info("Skipping verify (-DskipVerify=true)");
         }
@@ -227,7 +227,7 @@ public class ReleaseMojo extends AbstractMojo {
 
         // Verify build with new SNAPSHOT version
         ReleaseSupport.exec(gitRoot, getLog(),
-                mvnw.getAbsolutePath(), "clean", "verify", "-B");
+                mvnw.getAbsolutePath(), "clean", "verify", "-B", "-T", "1");
 
         // Commit
         ReleaseSupport.exec(gitRoot, getLog(), "git", "add", "pom.xml");
@@ -293,7 +293,7 @@ public class ReleaseMojo extends AbstractMojo {
             // with BOM imports can resolve classified artifacts.
             getLog().info("Deploying to Nexus...");
             ReleaseSupport.exec(gitRoot, getLog(),
-                    mvnw.getAbsolutePath(), "clean", "deploy", "-B",
+                    mvnw.getAbsolutePath(), "clean", "deploy", "-B", "-T", "1",
                     "-P", "release,signArtifacts");
         } finally {
             // Always return to main, even if deploy fails
