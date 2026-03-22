@@ -20,7 +20,7 @@
 
     <parent>
         <groupId>network.ike</groupId>
-        <artifactId>ike-maven-plugin-reactor</artifactId>
+        <artifactId>ike-tooling</artifactId>
     </parent>
 
     <artifactId>ike-maven-plugin</artifactId>

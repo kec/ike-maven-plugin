@@ -18,11 +18,11 @@
     <modelVersion>4.1.0</modelVersion>
 
     <groupId>network.ike</groupId>
-    <artifactId>ike-maven-plugin-reactor</artifactId>
+    <artifactId>ike-tooling</artifactId>
     <version>3-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>IKE Maven Plugin</name>
+    <name>IKE Tooling</name>
     <description>
         Workspace management, release orchestration, gitflow workflows,
         and build-time utilities for IKE Community projects.
@@ -54,13 +54,13 @@
         </snapshotRepository>
         <site>
             <id>ike-site</id>
-            <url>scpexe://proxy/srv/ike-site/ike-maven-plugin</url>
+            <url>scpexe://proxy/srv/ike-site/ike-tooling</url>
         </site>
     </distributionManagement>
 
     <properties>
         <!-- Site -->
-        <site.deploy.url>scpexe://proxy/srv/ike-site/ike-maven-plugin</site.deploy.url>
+        <site.deploy.url>scpexe://proxy/srv/ike-site/ike-tooling</site.deploy.url>
 
         <!-- Build -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -145,6 +145,6 @@
 
     <subprojects>
         <subproject>ike-workspace-model</subproject>
-        <subproject>plugin</subproject>
+        <subproject>ike-maven-plugin</subproject>
     </subprojects>
 </project>
