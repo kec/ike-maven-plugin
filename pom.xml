@@ -212,11 +212,17 @@
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
             </plugin>
-            <!-- Ensure the reactor POM is deployed to Nexus.
-                 Maven 4 skips pom-packaging reactor POM deployment by default,
+            <!-- Ensure the reactor POM is installed AND deployed to Nexus.
+                 Maven 4 skips pom-packaging reactor POM by default,
                  but consumers need it to resolve ike-maven-plugin's parent. -->
             <plugin>
                 <artifactId>maven-install-plugin</artifactId>
+                <configuration>
+                    <skip>false</skip>
+                </configuration>
+            </plugin>
+            <plugin>
+                <artifactId>maven-deploy-plugin</artifactId>
                 <configuration>
                     <skip>false</skip>
                 </configuration>
