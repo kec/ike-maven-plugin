@@ -1,1 +1,8 @@
 target/
+.idea/
+*.iml
+.mvn/local-repo/
+
+# site:stage creates directories at project root based on
+# distributionManagement site URL path structure
+ike-pipeline/
