@@ -47,7 +47,7 @@
 
     <body>
         <breadcrumbs>
-            <item name="IKE" href="http://ike.komet.sh/"/>
+            <item name="IKE" href="https://ike.komet.sh/"/>
             <item name="IKE Tooling" href="index.html"/>
         </breadcrumbs>
         <links>
