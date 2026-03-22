@@ -27,6 +27,9 @@ public final class VersionSupport {
     /**
      * Derive the release version from a SNAPSHOT version.
      * Equivalent to {@link #stripSnapshot(String)}.
+     *
+     * @param snapshotVersion version to strip
+     * @return release version without -SNAPSHOT suffix
      */
     public static String deriveReleaseVersion(String snapshotVersion) {
         return stripSnapshot(snapshotVersion);
@@ -91,6 +94,9 @@ public final class VersionSupport {
      * Extract the numeric base version, stripping any branch qualifier.
      * {@code "1.2.0-my-feature"} becomes {@code "1.2.0"};
      * {@code "1.2.0"} is unchanged.
+     *
+     * @param version version string possibly containing a branch qualifier
+     * @return numeric portion only
      */
     public static String extractNumericBase(String version) {
         // Find the first '-' that follows a digit and precedes a letter
@@ -106,6 +112,9 @@ public final class VersionSupport {
 
     /**
      * Check whether a version string is a SNAPSHOT.
+     *
+     * @param version version to check
+     * @return true if version ends with -SNAPSHOT
      */
     public static boolean isSnapshot(String version) {
         return version != null && version.endsWith("-SNAPSHOT");
@@ -114,6 +123,9 @@ public final class VersionSupport {
     /**
      * Check whether a version string is branch-qualified
      * (has a non-numeric qualifier before -SNAPSHOT).
+     *
+     * @param version version to check
+     * @return true if version contains a branch qualifier
      */
     public static boolean isBranchQualified(String version) {
         if (!isSnapshot(version)) return false;

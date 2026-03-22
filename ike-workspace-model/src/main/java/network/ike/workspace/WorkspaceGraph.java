@@ -28,6 +28,7 @@ public final class WorkspaceGraph {
     /** Reverse edges: component → components that depend on it. */
     private final Map<String, List<String>> reverse;
 
+    /** @param manifest parsed workspace manifest */
     public WorkspaceGraph(Manifest manifest) {
         this.manifest = manifest;
         this.forward = buildForwardEdges();
@@ -36,6 +37,8 @@ public final class WorkspaceGraph {
 
     /**
      * Return the underlying manifest.
+     *
+     * @return the parsed workspace manifest
      */
     public Manifest manifest() {
         return manifest;
@@ -100,6 +103,8 @@ public final class WorkspaceGraph {
 
     /**
      * Topological sort of all components.
+     *
+     * @return component names in dependency order (leaves first)
      */
     public List<String> topologicalSort() {
         return topologicalSort(Set.of());
@@ -149,6 +154,8 @@ public final class WorkspaceGraph {
      * Detect dependency cycles. Returns the first cycle found as a
      * list of component names forming the cycle, or an empty list
      * if no cycles exist.
+     *
+     * @return cycle path, or empty list if acyclic
      */
     public List<String> detectCycle() {
         // DFS with three-color marking: WHITE=unvisited, GRAY=in-stack, BLACK=done
@@ -250,6 +257,8 @@ public final class WorkspaceGraph {
     /**
      * Verify manifest consistency. Returns a list of error messages;
      * an empty list means the manifest is valid.
+     *
+     * @return error messages, or empty list if valid
      */
     public List<String> verify() {
         List<String> errors = new ArrayList<>();
