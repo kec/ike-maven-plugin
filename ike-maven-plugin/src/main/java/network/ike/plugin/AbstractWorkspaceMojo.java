@@ -128,6 +128,21 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
     }
 
     /**
+     * Check whether a workspace.yaml exists in the directory hierarchy.
+     * Does not throw — returns false if no manifest is found.
+     *
+     * @return true if running inside a workspace, false for a bare repo
+     */
+    protected boolean isWorkspaceMode() {
+        try {
+            resolveManifest();
+            return true;
+        } catch (MojoExecutionException e) {
+            return false;
+        }
+    }
+
+    /**
      * Prompt the user interactively for a required parameter when it
      * was not supplied on the command line.
      *

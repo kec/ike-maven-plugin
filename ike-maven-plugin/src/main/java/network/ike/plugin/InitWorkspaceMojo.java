@@ -96,11 +96,13 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
                 getLog().info("  ↻ " + name
                         + " — initializing git in existing directory (Syncthing)");
                 initSyncthingRepo(dir, repo, branch);
+                installHooks(dir);
                 syncthing++;
             } else {
                 // Fresh clone
                 getLog().info("  ↓ " + name + " — cloning from " + repo);
                 cloneRepo(root, name, repo, branch);
+                installHooks(new File(root, name));
                 cloned++;
             }
         }
@@ -133,5 +135,35 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             throws MojoExecutionException {
         ReleaseSupport.exec(root, getLog(),
                 "git", "clone", "-b", branch, repo, name);
+    }
+
+    /**
+     * Install defensive git hooks in the component's .git/hooks/ directory.
+     * Skips if the hook already exists (don't overwrite custom hooks).
+     */
+    private void installHooks(File componentDir) {
+        File hooksDir = new File(componentDir, ".git/hooks");
+        File postCheckout = new File(hooksDir, "post-checkout");
+
+        if (postCheckout.exists()) {
+            getLog().debug("  Hook already exists: " + postCheckout);
+            return;
+        }
+
+        try {
+            if (!hooksDir.exists()) {
+                hooksDir.mkdirs();
+            }
+            String hookScript = "#!/bin/sh\n"
+                    + "# Installed by ike:init \u2014 warns on direct branching.\n"
+                    + "# Remove this file to disable the check.\n"
+                    + "mvn -q ike:check-branch 2>/dev/null\n";
+            java.nio.file.Files.writeString(postCheckout.toPath(), hookScript,
+                    java.nio.charset.StandardCharsets.UTF_8);
+            postCheckout.setExecutable(true);
+            getLog().info("    Installed post-checkout hook");
+        } catch (java.io.IOException e) {
+            getLog().warn("    Could not install hook: " + e.getMessage());
+        }
     }
 }

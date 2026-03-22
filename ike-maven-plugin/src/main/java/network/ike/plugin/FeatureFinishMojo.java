@@ -1,6 +1,7 @@
 package network.ike.plugin;
 
 import network.ike.workspace.Component;
+import network.ike.workspace.ManifestWriter;
 import network.ike.workspace.VersionSupport;
 import network.ike.workspace.WorkspaceGraph;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -8,14 +9,19 @@ import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * Finish a feature branch — merge back to main across components.
  *
+ * <p><strong>Workspace mode</strong> (workspace.yaml found):</p>
  * <p>For each component in the specified group that is currently on
  * the feature branch:
  * <ol>
@@ -27,7 +33,11 @@ import java.util.Set;
  *   <li>Merges the feature branch with {@code --no-ff}</li>
  *   <li>Tags the merge point as {@code merge/feature/<name>}</li>
  *   <li>Optionally pushes to origin</li>
+ *   <li>Updates workspace.yaml branch fields back to targetBranch</li>
  * </ol>
+ *
+ * <p><strong>Bare mode</strong> (no workspace.yaml):</p>
+ * <p>Merges the feature branch in the current repo only.
  *
  * <p>Components are processed in <b>reverse</b> topological order so
  * that leaf components (komet-desktop) merge first, and foundation
@@ -69,10 +79,17 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
     public void execute() throws MojoExecutionException {
         feature = requireParam(feature, "feature", "Feature name (expects branch feature/<name>)");
 
+        String branchName = "feature/" + feature;
+
+        if (!isWorkspaceMode()) {
+            executeBareMode(branchName);
+            return;
+        }
+
+        // --- Workspace mode ---
         WorkspaceGraph graph = loadGraph();
         File root = workspaceRoot();
 
-        String branchName = "feature/" + feature;
         String mergeTag = "merge/" + branchName;
 
         Set<String> targets;
@@ -88,10 +105,10 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
         java.util.Collections.reverse(reversed);
 
         getLog().info("");
-        getLog().info("IKE Workspace — Feature Finish");
-        getLog().info("══════════════════════════════════════════════════════════════");
+        getLog().info("IKE Workspace \u2014 Feature Finish");
+        getLog().info("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
         getLog().info("  Feature:  " + feature);
-        getLog().info("  Branch:   " + branchName + " → " + targetBranch);
+        getLog().info("  Branch:   " + branchName + " \u2192 " + targetBranch);
         getLog().info("  Merge tag:" + mergeTag);
         getLog().info("  Push:     " + push);
         if (dryRun) {
@@ -106,14 +123,14 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
             File gitDir = new File(dir, ".git");
 
             if (!gitDir.exists()) {
-                getLog().info("  ⚠ " + name + " — not cloned, skipping");
+                getLog().info("  \u26A0 " + name + " \u2014 not cloned, skipping");
                 continue;
             }
 
             String currentBranch = gitBranch(dir);
             if (!currentBranch.equals(branchName)) {
-                getLog().info("  · " + name + " — on " + currentBranch
-                        + ", not " + branchName + " — skipping");
+                getLog().info("  \u00B7 " + name + " \u2014 on " + currentBranch
+                        + ", not " + branchName + " \u2014 skipping");
                 continue;
             }
 
@@ -128,7 +145,7 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
         }
 
         if (eligible.isEmpty()) {
-            getLog().info("  No components on " + branchName + " — nothing to do.");
+            getLog().info("  No components on " + branchName + " \u2014 nothing to do.");
             getLog().info("");
             return;
         }
@@ -150,16 +167,16 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
                     String baseVersion = VersionSupport.extractNumericBase(
                             VersionSupport.stripSnapshot(component.version()))
                             + "-SNAPSHOT";
-                    versionInfo = " (version → " + baseVersion + ")";
+                    versionInfo = " (version \u2192 " + baseVersion + ")";
                 }
                 getLog().info("  [dry-run] " + name
-                        + " — would merge " + branchName + " → "
+                        + " \u2014 would merge " + branchName + " \u2192 "
                         + targetBranch + versionInfo);
                 merged++;
                 continue;
             }
 
-            getLog().info("  → " + name);
+            getLog().info("  \u2192 " + name);
 
             // Strip branch qualifier from version if present
             if (component.version() != null
@@ -170,13 +187,13 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
                             VersionSupport.stripSnapshot(currentVersion))
                             + "-SNAPSHOT";
                     getLog().info("    version: " + currentVersion
-                            + " → " + baseVersion);
+                            + " \u2192 " + baseVersion);
                     setAllVersions(dir, currentVersion, baseVersion);
                     ReleaseSupport.exec(dir, getLog(),
                             "git", "add", "-A");
                     ReleaseSupport.exec(dir, getLog(),
                             "git", "commit", "-m",
-                            "merge-prep: strip branch qualifier → " + baseVersion);
+                            "merge-prep: strip branch qualifier \u2192 " + baseVersion);
                 }
             }
 
@@ -208,7 +225,7 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
         getLog().info("");
         getLog().info("  Merged: " + merged + " components");
         if (!push) {
-            getLog().info("  ⚠ Changes are local only. Run with -Dpush=true to push.");
+            getLog().info("  \u26A0 Changes are local only. Run with -Dpush=true to push.");
         }
 
         // Clean up feature branch snapshot sites for each merged component.
@@ -226,6 +243,129 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
                             + ": " + e.getMessage());
                 }
             }
+        }
+
+        // Update workspace.yaml branch fields back to targetBranch
+        if (merged > 0 && !dryRun) {
+            try {
+                Path manifestPath = resolveManifest();
+                Map<String, String> updates = new LinkedHashMap<>();
+                for (String name : eligible) {
+                    updates.put(name, targetBranch);
+                }
+                ManifestWriter.updateBranches(manifestPath, updates);
+                getLog().info("  Updated workspace.yaml branches \u2192 " + targetBranch);
+
+                File wsRoot = manifestPath.getParent().toFile();
+                File wsGit = new File(wsRoot, ".git");
+                if (wsGit.exists()) {
+                    ReleaseSupport.exec(wsRoot, getLog(),
+                            "git", "add", "workspace.yaml");
+                    ReleaseSupport.exec(wsRoot, getLog(),
+                            "git", "commit", "-m",
+                            "workspace: restore branches to " + targetBranch + " after feature/" + feature);
+                }
+            } catch (IOException e) {
+                getLog().warn("  Could not update workspace.yaml: " + e.getMessage());
+            }
+        }
+
+        getLog().info("");
+    }
+
+    /**
+     * Bare-mode: merge feature branch in the current repo only.
+     */
+    private void executeBareMode(String branchName) throws MojoExecutionException {
+        File dir = new File(System.getProperty("user.dir"));
+        String mergeTag = "merge/" + branchName;
+
+        getLog().info("");
+        getLog().info("IKE Feature Finish (bare repo)");
+        getLog().info("\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550");
+        getLog().info("  Feature:  " + feature);
+        getLog().info("  Branch:   " + branchName + " \u2192 " + targetBranch);
+        getLog().info("  Push:     " + push);
+        if (dryRun) {
+            getLog().info("  Mode:     DRY RUN");
+        }
+        getLog().info("");
+
+        String currentBranch = gitBranch(dir);
+        if (!currentBranch.equals(branchName)) {
+            throw new MojoExecutionException(
+                    "Not on " + branchName + " (currently on " + currentBranch + ")");
+        }
+
+        String status = gitStatus(dir);
+        if (!status.isEmpty()) {
+            throw new MojoExecutionException(
+                    "Uncommitted changes. Commit or stash before finishing the feature.");
+        }
+
+        if (dryRun) {
+            getLog().info("  [dry-run] Would merge " + branchName + " \u2192 " + targetBranch);
+            getLog().info("");
+            return;
+        }
+
+        // Strip branch qualifier from version if present
+        File pom = new File(dir, "pom.xml");
+        if (pom.exists()) {
+            try {
+                String currentVersion = ReleaseSupport.readPomVersion(pom);
+                if (currentVersion != null && VersionSupport.isBranchQualified(currentVersion)) {
+                    String baseVersion = VersionSupport.extractNumericBase(
+                            VersionSupport.stripSnapshot(currentVersion)) + "-SNAPSHOT";
+                    getLog().info("  Version: " + currentVersion + " \u2192 " + baseVersion);
+                    ReleaseSupport.setPomVersion(pom, currentVersion, baseVersion);
+                    // Update submodule POMs too
+                    List<File> allPoms = ReleaseSupport.findPomFiles(dir);
+                    for (File subPom : allPoms) {
+                        if (!subPom.equals(pom)) {
+                            try {
+                                String content = java.nio.file.Files.readString(
+                                        subPom.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                                if (content.contains("<version>" + currentVersion + "</version>")) {
+                                    String updated = content.replace(
+                                            "<version>" + currentVersion + "</version>",
+                                            "<version>" + baseVersion + "</version>");
+                                    java.nio.file.Files.writeString(
+                                            subPom.toPath(), updated,
+                                            java.nio.charset.StandardCharsets.UTF_8);
+                                }
+                            } catch (java.io.IOException e) {
+                                // skip
+                            }
+                        }
+                    }
+                    ReleaseSupport.exec(dir, getLog(), "git", "add", "-A");
+                    ReleaseSupport.exec(dir, getLog(), "git", "commit", "-m",
+                            "merge-prep: strip branch qualifier \u2192 " + baseVersion);
+                }
+            } catch (MojoExecutionException e) {
+                getLog().debug("Could not read POM version: " + e.getMessage());
+            }
+        }
+
+        // Merge
+        ReleaseSupport.exec(dir, getLog(),
+                "git", "checkout", targetBranch);
+        ReleaseSupport.exec(dir, getLog(),
+                "git", "merge", "--no-ff", branchName,
+                "-m", "Merge " + branchName + " into " + targetBranch);
+
+        // Tag
+        String tag = mergeTag + "/" + dir.getName();
+        ReleaseSupport.exec(dir, getLog(), "git", "tag", tag);
+        getLog().info("  Tagged: " + tag);
+
+        if (push) {
+            ReleaseSupport.exec(dir, getLog(),
+                    "git", "push", "origin", targetBranch);
+            ReleaseSupport.exec(dir, getLog(),
+                    "git", "push", "origin", tag);
+            getLog().info("  Pushed to origin");
         }
 
         getLog().info("");

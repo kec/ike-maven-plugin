@@ -30,6 +30,8 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  ike:init                                        Clone/initialize repos from manifest");
         getLog().info("  ike:pull                                        Git pull --rebase across repos");
         getLog().info("  ike:stignore                                    Generate .stignore for Syncthing");
+        getLog().info("  ike:check-branch                                Warn on direct branching (git hook)");
+        getLog().info("  ike:ws-sync                                     Sync workspace.yaml ↔ actual branches");
         getLog().info("");
         getLog().info("  ── Gitflow Goals ────────────────────────────────────────");
         getLog().info("  ike:feature-start                               Create feature branch across repos");
@@ -57,6 +59,11 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  -DskipVersion=true     Skip POM version qualification (feature-start)");
         getLog().info("  -DtargetBranch=<name>  Merge target (default: main)");
         getLog().info("  -Dpush=true            Push to origin after merge/tag");
+        getLog().info("  -DdryRun=true          Show plan without executing");
+        getLog().info("");
+        getLog().info("Options for ike:ws-sync:");
+        getLog().info("  -Dfrom=repos           Update workspace.yaml from repos (default)");
+        getLog().info("  -Dfrom=manifest        Switch repos to match workspace.yaml");
         getLog().info("  -DdryRun=true          Show plan without executing");
         getLog().info("");
         getLog().info("Options for ike:ws-checkpoint:");
