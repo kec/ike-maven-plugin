@@ -1,0 +1,7 @@
+// ike-tooling — Syncthing ignore patterns
+**/target
+**/.idea
+**/*.iml
+**/.claude/worktrees
+**/.mvn/local-repo
+**/ike-pipeline
