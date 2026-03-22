@@ -49,6 +49,9 @@ public class CleanSiteMojo extends AbstractMojo {
     @Parameter(property = "dryRun", defaultValue = "false")
     private boolean dryRun;
 
+    /** Creates this goal instance. */
+    public CleanSiteMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         File gitRoot = ReleaseSupport.gitRoot(new File("."));

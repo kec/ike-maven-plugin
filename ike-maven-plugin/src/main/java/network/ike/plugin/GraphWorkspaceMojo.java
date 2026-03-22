@@ -31,6 +31,9 @@ public class GraphWorkspaceMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "format", defaultValue = "text")
     String format;
 
+    /** Creates this goal instance. */
+    public GraphWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

@@ -51,6 +51,9 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "push", defaultValue = "false")
     boolean push;
 
+    /** Creates this goal instance. */
+    public WsCheckpointMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         name = requireParam(name, "name", "Checkpoint name");

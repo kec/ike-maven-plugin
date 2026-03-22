@@ -76,6 +76,9 @@ public class WsReleaseMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "push", defaultValue = "true")
     boolean push;
 
+    /** Creates this goal instance. */
+    public WsReleaseMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

@@ -29,6 +29,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
 
     /**
      * Load the manifest and build the workspace graph.
+     *
+     * @return the workspace dependency graph
+     * @throws MojoExecutionException if the manifest cannot be read
      */
     protected WorkspaceGraph loadGraph() throws MojoExecutionException {
         Path manifestPath = resolveManifest();
@@ -44,6 +47,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
 
     /**
      * Resolve the manifest path — explicit parameter, or search upward.
+     *
+     * @return path to the workspace manifest file
+     * @throws MojoExecutionException if the manifest cannot be found
      */
     protected Path resolveManifest() throws MojoExecutionException {
         if (manifest != null && manifest.exists()) {
@@ -67,6 +73,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
 
     /**
      * Resolve the workspace root directory (parent of workspace.yaml).
+     *
+     * @return the workspace root directory
+     * @throws MojoExecutionException if the manifest cannot be found
      */
     protected File workspaceRoot() throws MojoExecutionException {
         return resolveManifest().getParent().toFile();
@@ -75,6 +84,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
     /**
      * Run {@code git status --porcelain} on a component directory and
      * return the output (empty string = clean).
+     *
+     * @param componentDir the component directory to check
+     * @return git status output, empty if clean
      */
     protected String gitStatus(File componentDir) {
         try {
@@ -87,6 +99,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
 
     /**
      * Get the current branch of a component directory.
+     *
+     * @param componentDir the component directory to check
+     * @return the current branch name
      */
     protected String gitBranch(File componentDir) {
         try {
@@ -99,6 +114,9 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
 
     /**
      * Get the short SHA of HEAD for a component directory.
+     *
+     * @param componentDir the component directory to check
+     * @return the short SHA of HEAD
      */
     protected String gitShortSha(File componentDir) {
         try {

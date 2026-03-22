@@ -27,6 +27,9 @@ public class CascadeWorkspaceMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "component")
     String component;
 
+    /** Creates this goal instance. */
+    public CascadeWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         component = requireParam(component, "component", "Component that changed");

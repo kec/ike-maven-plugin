@@ -15,6 +15,9 @@ import org.apache.maven.plugins.annotations.Mojo;
 @Mojo(name = "workspace", requiresProject = false, threadSafe = true)
 public class WorkspaceMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public WorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         getLog().warn("ike:workspace is deprecated. Use the specific workspace goals:");

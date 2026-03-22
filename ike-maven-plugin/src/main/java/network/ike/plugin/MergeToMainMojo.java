@@ -14,6 +14,9 @@ import org.apache.maven.plugins.annotations.Mojo;
 @Mojo(name = "merge-to-main", requiresProject = false, threadSafe = true)
 public class MergeToMainMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public MergeToMainMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         getLog().warn("ike:merge-to-main is deprecated.");

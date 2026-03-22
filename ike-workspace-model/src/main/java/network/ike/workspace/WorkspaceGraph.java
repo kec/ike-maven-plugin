@@ -28,7 +28,10 @@ public final class WorkspaceGraph {
     /** Reverse edges: component → components that depend on it. */
     private final Map<String, List<String>> reverse;
 
-    /** @param manifest parsed workspace manifest */
+    /**
+     * Build a graph from the given manifest.
+     * @param manifest parsed workspace manifest
+     */
     public WorkspaceGraph(Manifest manifest) {
         this.manifest = manifest;
         this.forward = buildForwardEdges();

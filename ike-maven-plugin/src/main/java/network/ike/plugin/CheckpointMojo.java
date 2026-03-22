@@ -48,6 +48,9 @@ public class CheckpointMojo extends AbstractMojo {
     @Parameter(property = "skipVerify", defaultValue = "false")
     private boolean skipVerify;
 
+    /** Creates this goal instance. */
+    public CheckpointMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         File gitRoot = ReleaseSupport.gitRoot(new File("."));

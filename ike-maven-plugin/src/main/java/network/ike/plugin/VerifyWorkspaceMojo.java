@@ -18,6 +18,9 @@ import java.util.List;
 @Mojo(name = "verify", requiresProject = false, threadSafe = true)
 public class VerifyWorkspaceMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public VerifyWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

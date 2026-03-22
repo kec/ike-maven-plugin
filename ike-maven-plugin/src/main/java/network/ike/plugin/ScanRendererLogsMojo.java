@@ -48,6 +48,9 @@ public class ScanRendererLogsMojo extends AbstractMojo {
             "error|fatal|exception|failed|not found",
             Pattern.CASE_INSENSITIVE);
 
+    /** Creates this goal instance. */
+    public ScanRendererLogsMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (!logsDir.isDirectory()) {

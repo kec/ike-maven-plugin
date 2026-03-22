@@ -41,6 +41,9 @@ public class PatchDocbookMojo extends AbstractMojo {
     @Parameter(property = "docbookDir", required = true)
     File docbookDir;
 
+    /** Creates this goal instance. */
+    public PatchDocbookMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (!docbookDir.isDirectory()) {

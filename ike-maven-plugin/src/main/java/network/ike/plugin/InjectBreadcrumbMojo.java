@@ -46,6 +46,9 @@ public class InjectBreadcrumbMojo extends AbstractMojo {
     @Parameter(property = "breadcrumb.label", defaultValue = "\u2190 Project Site")
     String label;
 
+    /** Creates this goal instance. */
+    public InjectBreadcrumbMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (!targetDir.isDirectory()) {

@@ -74,6 +74,9 @@ public class StignoreWorkspaceMojo extends AbstractWorkspaceMojo {
             "**/node_modules"
     );
 
+    /** Creates this goal instance. */
+    public StignoreWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

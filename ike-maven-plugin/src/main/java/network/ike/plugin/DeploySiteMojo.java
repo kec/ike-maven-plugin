@@ -72,6 +72,9 @@ public class DeploySiteMojo extends AbstractMojo {
     @Parameter(property = "skipSwap", defaultValue = "false")
     private boolean skipSwap;
 
+    /** Creates this goal instance. */
+    public DeploySiteMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         File gitRoot = ReleaseSupport.gitRoot(new File("."));

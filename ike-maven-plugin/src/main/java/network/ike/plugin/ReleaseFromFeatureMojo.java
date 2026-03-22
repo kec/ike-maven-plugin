@@ -13,6 +13,9 @@ import org.apache.maven.plugins.annotations.Mojo;
 @Mojo(name = "release-from-feature", requiresProject = false, threadSafe = true)
 public class ReleaseFromFeatureMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public ReleaseFromFeatureMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         getLog().warn("ike:release-from-feature is not yet implemented.");

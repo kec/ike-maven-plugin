@@ -12,6 +12,9 @@ import org.apache.maven.plugins.annotations.Mojo;
 @Mojo(name = "help", requiresProject = false, threadSafe = true)
 public class IkeHelpMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public IkeHelpMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         getLog().info("");

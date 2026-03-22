@@ -30,6 +30,9 @@ public class StatusWorkspaceMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "group")
     String group;
 
+    /** Creates this goal instance. */
+    public StatusWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

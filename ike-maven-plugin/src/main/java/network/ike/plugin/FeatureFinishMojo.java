@@ -62,6 +62,9 @@ public class FeatureFinishMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "dryRun", defaultValue = "false")
     boolean dryRun;
 
+    /** Creates this goal instance. */
+    public FeatureFinishMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         feature = requireParam(feature, "feature", "Feature name (expects branch feature/<name>)");

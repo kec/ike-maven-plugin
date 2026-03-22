@@ -60,6 +60,9 @@ public class GenerateBomMojo extends AbstractMojo {
     @Parameter(property = "bom.source", defaultValue = "ike-parent")
     private String sourceArtifactId;
 
+    /** Creates this goal instance. */
+    public GenerateBomMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         // ── Find source module in reactor ────────────────────────────

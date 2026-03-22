@@ -24,6 +24,9 @@ import java.util.Set;
 @Mojo(name = "dashboard", requiresProject = false, threadSafe = true)
 public class DashboardWorkspaceMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public DashboardWorkspaceMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();

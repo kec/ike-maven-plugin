@@ -46,13 +46,14 @@ class ReleaseSupport {
                     .directory(workDir)
                     .redirectErrorStream(true)
                     .start();
-            // Route subprocess output through Maven's logger instead of
-            // inheritIO(), which corrupts surefire's fork protocol.
+            // Route subprocess output through Maven's logger, stripping
+            // Maven log prefixes to avoid redundant [INFO] [stdout] [INFO].
+            // Maps subprocess [WARNING]/[ERROR] to the correct parent level.
             try (var reader = new java.io.BufferedReader(
                     new java.io.InputStreamReader(proc.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    log.info("[stdout] " + line);
+                    routeSubprocessLine(log, line);
                 }
             }
             int exit = proc.waitFor();
@@ -64,6 +65,32 @@ class ReleaseSupport {
         } catch (IOException | InterruptedException e) {
             throw new MojoExecutionException(
                     "Failed to execute: " + String.join(" ", command), e);
+        }
+    }
+
+    /**
+     * Route a subprocess output line through Maven's logger at the
+     * correct level. Strips Maven log prefixes ([INFO], [WARNING],
+     * [ERROR]) from the line to avoid redundant nesting.
+     *
+     * @param log  Maven logger
+     * @param line raw subprocess output line
+     */
+    static void routeSubprocessLine(Log log, String line) {
+        routeSubprocessLine(log, line, "");
+    }
+
+    static void routeSubprocessLine(Log log, String line, String prefix) {
+        if (line.startsWith("[ERROR] ")) {
+            log.error(prefix + line.substring(8));
+        } else if (line.startsWith("[WARNING] ")) {
+            log.warn(prefix + line.substring(10));
+        } else if (line.startsWith("[INFO] ")) {
+            log.info(prefix + line.substring(7));
+        } else if (line.startsWith("[DEBUG] ")) {
+            log.debug(prefix + line.substring(8));
+        } else {
+            log.info(prefix + line);
         }
     }
 
@@ -101,8 +128,9 @@ class ReleaseSupport {
                                             StandardCharsets.UTF_8))) {
                                 String line;
                                 while ((line = reader.readLine()) != null) {
+                                    String prefix = "[" + task.label() + "] ";
                                     synchronized (log) {
-                                        log.info("[" + task.label() + "] " + line);
+                                        routeSubprocessLine(log, line, prefix);
                                     }
                                 }
                             }

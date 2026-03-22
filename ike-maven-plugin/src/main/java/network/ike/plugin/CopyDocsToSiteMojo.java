@@ -46,6 +46,9 @@ public class CopyDocsToSiteMojo extends AbstractMojo {
     public static final List<String> COPY_EXTENSIONS =
             List.of(".html", ".svg", ".png", ".jpg", ".css");
 
+    /** Creates this goal instance. */
+    public CopyDocsToSiteMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (!generatedDocsDir.isDirectory()) {

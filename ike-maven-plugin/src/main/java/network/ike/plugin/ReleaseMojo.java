@@ -66,6 +66,9 @@ public class ReleaseMojo extends AbstractMojo {
     /** Override working directory for tests. If null, uses current directory. */
     File baseDir;
 
+    /** Creates this goal instance. */
+    public ReleaseMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         File startDir = baseDir != null ? baseDir : new File(".");

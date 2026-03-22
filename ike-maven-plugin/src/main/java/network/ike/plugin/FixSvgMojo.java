@@ -38,6 +38,9 @@ public class FixSvgMojo extends AbstractMojo {
     @Parameter(property = "skip", defaultValue = "false")
     boolean skip;
 
+    /** Creates this goal instance. */
+    public FixSvgMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         if (skip) {
