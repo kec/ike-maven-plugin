@@ -19,7 +19,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-maven-plugin-reactor</artifactId>
-    <version>1-SNAPSHOT</version>
+    <version>1</version>
     <packaging>pom</packaging>
 
     <name>IKE Maven Plugin</name>
@@ -52,9 +52,16 @@
             <id>ike-snapshots</id>
             <url>https://nexus.tinkar.org/repository/ike-snapshots/</url>
         </snapshotRepository>
+        <site>
+            <id>ike-site</id>
+            <url>scpexe://proxy/srv/ike-site/ike-maven-plugin</url>
+        </site>
     </distributionManagement>
 
     <properties>
+        <!-- Site -->
+        <site.deploy.url>scpexe://proxy/srv/ike-site/ike-maven-plugin</site.deploy.url>
+
         <!-- Build -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
