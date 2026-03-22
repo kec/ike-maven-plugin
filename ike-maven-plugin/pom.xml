@@ -141,6 +141,10 @@
                              surefire's fork communication protocol. Redirect all
                              test output to files to keep the channel clean. -->
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                        <!-- Exclude container tests by default — they need Docker.
+                             Run with: mvn verify -Dsurefire.excludedGroups=""
+                             Run all tests including container tests. -->
+                        <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                     </configuration>
                 </plugin>
             </plugins>

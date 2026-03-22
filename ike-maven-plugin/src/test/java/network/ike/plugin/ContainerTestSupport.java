@@ -1,7 +1,6 @@
 package network.ike.plugin;
 
 import org.junit.jupiter.api.Tag;
-import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -13,7 +12,6 @@ import java.security.NoSuchAlgorithmException;
  * and run only with {@code mvn verify -Dgroups=container}.
  */
 @Tag("container")
-@EnabledIf("isDockerAvailable")
 abstract class ContainerTestSupport {
 
     /**

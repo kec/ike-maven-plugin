@@ -519,10 +519,27 @@ class ReleaseSupport {
      */
     static void cleanRemoteSiteDir(File workDir, Log log, String remotePath)
             throws MojoExecutionException {
+        cleanRemoteSiteDir(workDir, log, remotePath, "ssh", SITE_SSH_HOST);
+    }
+
+    /**
+     * Overload accepting an explicit SSH command prefix — package-private
+     * for testing against containers.
+     *
+     * @param sshPrefix the SSH command tokens (e.g., "ssh", "-i", "key",
+     *                  "-p", "2222", "user@localhost")
+     */
+    static void cleanRemoteSiteDir(File workDir, Log log, String remotePath,
+                                    String... sshPrefix)
+            throws MojoExecutionException {
         validateRemotePath(remotePath);
         log.info("Cleaning remote site: " + remotePath);
-        exec(workDir, log,
-                "ssh", SITE_SSH_HOST, "rm", "-rf", remotePath);
+        String[] cmd = new String[sshPrefix.length + 3];
+        System.arraycopy(sshPrefix, 0, cmd, 0, sshPrefix.length);
+        cmd[sshPrefix.length] = "rm";
+        cmd[sshPrefix.length + 1] = "-rf";
+        cmd[sshPrefix.length + 2] = remotePath;
+        exec(workDir, log, cmd);
     }
 
     /**
@@ -546,22 +563,31 @@ class ReleaseSupport {
      */
     static void swapRemoteSiteDir(File workDir, Log log, String remotePath)
             throws MojoExecutionException {
+        swapRemoteSiteDir(workDir, log, remotePath, "ssh", SITE_SSH_HOST);
+    }
+
+    /**
+     * Overload accepting an explicit SSH command prefix — package-private
+     * for testing against containers.
+     *
+     * @param sshPrefix the SSH command tokens (e.g., "ssh", "-i", "key",
+     *                  "-p", "2222", "user@localhost")
+     */
+    static void swapRemoteSiteDir(File workDir, Log log, String remotePath,
+                                   String... sshPrefix)
+            throws MojoExecutionException {
         validateRemotePath(remotePath);
         String staging = remotePath + ".staging";
         String old = remotePath + ".old";
 
         log.info("Swapping site: " + staging + " → " + remotePath);
-        // Single SSH command: atomic as possible
-        // - Remove any leftover .old from a previous failed swap
-        // - Move current live → .old (may not exist on first deploy)
-        // - Move staging → live
-        // - Remove .old
-        exec(workDir, log,
-                "ssh", SITE_SSH_HOST,
-                "rm -rf " + old
-                        + " && (mv " + remotePath + " " + old + " 2>/dev/null || true)"
-                        + " && mv " + staging + " " + remotePath
-                        + " && rm -rf " + old);
+        String[] cmd = new String[sshPrefix.length + 1];
+        System.arraycopy(sshPrefix, 0, cmd, 0, sshPrefix.length);
+        cmd[sshPrefix.length] = "rm -rf " + old
+                + " && (mv " + remotePath + " " + old + " 2>/dev/null || true)"
+                + " && mv " + staging + " " + remotePath
+                + " && rm -rf " + old;
+        exec(workDir, log, cmd);
     }
 
     /**

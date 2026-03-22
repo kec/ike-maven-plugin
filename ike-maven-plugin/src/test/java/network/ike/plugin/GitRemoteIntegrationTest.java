@@ -1,5 +1,6 @@
 package network.ike.plugin;
 
+import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,202 @@ class GitRemoteIntegrationTest extends ContainerTestSupport {
         String branches = sshExecCapture(
                 "cd " + BARE_REPO + " && git branch");
         assertThat(branches).doesNotContain("feature/to-delete");
+    }
+
+    // ── PullWorkspaceMojo tests ────────────────────────────────────
+
+    @Test
+    void pullWorkspaceMojo_pullsNewCommits(@TempDir Path workDir)
+            throws Exception {
+        // Setup: create bare repo, clone it as a "component", push a
+        // new commit from another clone, then run PullWorkspaceMojo
+        // and verify the component has the new commit.
+
+        // Reset bare repo
+        sshExecStatic("rm -rf " + BARE_REPO + " && git init --bare " + BARE_REPO);
+
+        // Create the "workspace" directory structure
+        File wsRoot = workDir.resolve("workspace").toFile();
+        wsRoot.mkdirs();
+
+        // Clone into a component directory (simulates an initialized component)
+        String componentName = "my-component";
+        File componentDir = new File(wsRoot, componentName);
+
+        // First, push an initial commit so we have something to clone
+        File seedDir = workDir.resolve("seed").toFile();
+        seedDir.mkdirs();
+        gitLocal(seedDir, "git", "init", "-b", "main");
+        gitLocal(seedDir, "git", "config", "user.email", "test@test.com");
+        gitLocal(seedDir, "git", "config", "user.name", "Test");
+        Files.writeString(seedDir.toPath().resolve("README.md"), "# initial");
+        gitLocal(seedDir, "git", "add", "README.md");
+        gitLocal(seedDir, "git", "commit", "-m", "initial commit");
+        gitLocal(seedDir, "git", "remote", "add", "origin", sshUrl());
+        gitLocal(seedDir, "git", "push", "-u", "origin", "main");
+
+        // Clone into the workspace component directory
+        gitLocal(wsRoot, "git", "clone", sshUrl(), componentName);
+
+        // Configure SSH for the cloned repo
+        String sshCmd = "ssh -i " + privateKeyFile
+                + " -o StrictHostKeyChecking=no"
+                + " -o UserKnownHostsFile=/dev/null"
+                + " -o LogLevel=ERROR"
+                + " -p " + sshPort;
+        gitLocal(componentDir, "git", "config", "core.sshCommand", sshCmd);
+
+        // Push a new commit from the seed directory (simulates another dev)
+        Files.writeString(seedDir.toPath().resolve("NEW-FILE.md"), "new content");
+        gitLocal(seedDir, "git", "add", "NEW-FILE.md");
+        gitLocal(seedDir, "git", "commit", "-m", "second commit");
+        gitLocal(seedDir, "git", "push", "origin", "main");
+
+        // Verify the component doesn't have the new file yet
+        assertThat(new File(componentDir, "NEW-FILE.md")).doesNotExist();
+
+        // Create a minimal workspace.yaml
+        String manifestYaml = """
+                schema-version: "1.0"
+                components:
+                  %s:
+                    type: software
+                    description: test component
+                    repo: %s
+                    branch: main
+                """.formatted(componentName, sshUrl());
+        Files.writeString(wsRoot.toPath().resolve("workspace.yaml"), manifestYaml);
+
+        // Create and configure the PullWorkspaceMojo
+        PullWorkspaceMojo mojo = new PullWorkspaceMojo();
+        setField(mojo, "manifest",
+                new File(wsRoot, "workspace.yaml"));
+
+        // Execute the Mojo
+        mojo.execute();
+
+        // Verify the component now has the new file
+        assertThat(new File(componentDir, "NEW-FILE.md")).exists();
+        assertThat(Files.readString(componentDir.toPath().resolve("NEW-FILE.md")))
+                .isEqualTo("new content");
+    }
+
+    @Test
+    void pullWorkspaceMojo_skipsUninitializedComponents(@TempDir Path workDir)
+            throws Exception {
+        // Workspace with a component that hasn't been cloned yet
+        File wsRoot = workDir.resolve("workspace").toFile();
+        wsRoot.mkdirs();
+
+        // Create workspace.yaml referencing a component that doesn't exist on disk
+        String manifestYaml = """
+                schema-version: "1.0"
+                components:
+                  missing-component:
+                    type: software
+                    description: not yet cloned
+                    repo: git@github.com:fake/repo.git
+                    branch: main
+                """;
+        Files.writeString(wsRoot.toPath().resolve("workspace.yaml"), manifestYaml);
+
+        PullWorkspaceMojo mojo = new PullWorkspaceMojo();
+        setField(mojo, "manifest",
+                new File(wsRoot, "workspace.yaml"));
+
+        // Should complete without error — just skip the uncloned component
+        mojo.execute();
+
+        // The directory should not have been created
+        assertThat(new File(wsRoot, "missing-component/.git")).doesNotExist();
+    }
+
+    @Test
+    void pullWorkspaceMojo_pullsOnlyNamedGroup(@TempDir Path workDir)
+            throws Exception {
+        // Reset bare repo
+        sshExecStatic("rm -rf " + BARE_REPO + " && git init --bare " + BARE_REPO);
+
+        File wsRoot = workDir.resolve("workspace").toFile();
+        wsRoot.mkdirs();
+
+        // Push initial commit
+        File seedDir = workDir.resolve("seed").toFile();
+        seedDir.mkdirs();
+        gitLocal(seedDir, "git", "init", "-b", "main");
+        gitLocal(seedDir, "git", "config", "user.email", "test@test.com");
+        gitLocal(seedDir, "git", "config", "user.name", "Test");
+        Files.writeString(seedDir.toPath().resolve("README.md"), "# initial");
+        gitLocal(seedDir, "git", "add", "README.md");
+        gitLocal(seedDir, "git", "commit", "-m", "initial commit");
+        gitLocal(seedDir, "git", "remote", "add", "origin", sshUrl());
+        gitLocal(seedDir, "git", "push", "-u", "origin", "main");
+
+        // Clone as component-a
+        gitLocal(wsRoot, "git", "clone", sshUrl(), "component-a");
+        File compA = new File(wsRoot, "component-a");
+        String sshCmd = "ssh -i " + privateKeyFile
+                + " -o StrictHostKeyChecking=no"
+                + " -o UserKnownHostsFile=/dev/null"
+                + " -o LogLevel=ERROR"
+                + " -p " + sshPort;
+        gitLocal(compA, "git", "config", "core.sshCommand", sshCmd);
+
+        // Push a new commit
+        Files.writeString(seedDir.toPath().resolve("GROUPED.md"), "grouped");
+        gitLocal(seedDir, "git", "add", "GROUPED.md");
+        gitLocal(seedDir, "git", "commit", "-m", "grouped commit");
+        gitLocal(seedDir, "git", "push", "origin", "main");
+
+        // Create workspace.yaml with a group
+        String manifestYaml = """
+                schema-version: "1.0"
+                components:
+                  component-a:
+                    type: software
+                    description: in group
+                    repo: %s
+                    branch: main
+                  component-b:
+                    type: software
+                    description: not in group
+                    repo: git@github.com:fake/repo.git
+                    branch: main
+                groups:
+                  my-group:
+                    - component-a
+                """.formatted(sshUrl());
+        Files.writeString(wsRoot.toPath().resolve("workspace.yaml"), manifestYaml);
+
+        PullWorkspaceMojo mojo = new PullWorkspaceMojo();
+        setField(mojo, "manifest",
+                new File(wsRoot, "workspace.yaml"));
+        setField(mojo, "group", "my-group");
+
+        mojo.execute();
+
+        // component-a should have the new file
+        assertThat(new File(compA, "GROUPED.md")).exists();
+        // component-b should still not exist (never cloned, not in group)
+        assertThat(new File(wsRoot, "component-b/.git")).doesNotExist();
+    }
+
+    // ── Test helper: set Mojo field via reflection ──────────────────
+
+    private static void setField(Object obj, String fieldName, Object value)
+            throws Exception {
+        Class<?> cls = obj.getClass();
+        while (cls != null) {
+            try {
+                java.lang.reflect.Field field = cls.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                field.set(obj, value);
+                return;
+            } catch (NoSuchFieldException e) {
+                cls = cls.getSuperclass();
+            }
+        }
+        throw new NoSuchFieldException(fieldName + " not found on " + obj.getClass());
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
