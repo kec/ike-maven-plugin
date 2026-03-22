@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DeploySiteMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">DeploySiteMojo.java</span></div><h1>DeploySiteMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+
+/**
+ * Generate and deploy the Maven site to a versioned URL.
+ *
+ * &lt;p&gt;This goal deploys the project site to one of three location
+ * types under {@code ike.komet.sh}:
+ * &lt;ul&gt;
+ *   &lt;li&gt;{@code release} — overwritten on each release&lt;/li&gt;
+ *   &lt;li&gt;{@code snapshot} — versioned by git branch
+ *       (e.g., {@code snapshot/main/}, {@code snapshot/feature/my-work/})&lt;/li&gt;
+ *   &lt;li&gt;{@code checkpoint} — immutable, versioned subdirectory&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * &lt;p&gt;Every deployment uses a stage-and-swap strategy: SCP uploads
+ * to a {@code .staging} directory, then an atomic rename replaces
+ * the live directory. This eliminates stale files from previous
+ * deploys (SCP alone only copies, never deletes) and avoids a
+ * window where the site is missing.
+ *
+ * &lt;p&gt;Usage:
+ * &lt;pre&gt;
+ * mvn ike:deploy-site -DsiteType=snapshot
+ * mvn ike:deploy-site -DsiteType=snapshot -Dbranch=feature/kec-march-25
+ * mvn ike:deploy-site -DsiteType=checkpoint -DsiteVersion=7-checkpoint.20260228.1
+ * mvn ike:deploy-site -DsiteType=release
+ * &lt;/pre&gt;
+ */
+@Mojo(name = &quot;deploy-site&quot;, requiresProject = false, aggregator = true, threadSafe = true)
+<span class="nc" id="L37">public class DeploySiteMojo extends AbstractMojo {</span>
+
+    private static final String SITE_URL_BASE = &quot;scpexe://proxy/srv/ike-site/&quot;;
+
+    @Parameter(property = &quot;siteType&quot;, required = true)
+    private String siteType;
+
+    /**
+     * Explicit site version for checkpoint deploys.
+     * Defaults to the POM version.
+     */
+    @Parameter(property = &quot;siteVersion&quot;)
+    private String siteVersion;
+
+    /**
+     * Git branch for snapshot deploys. Defaults to the current branch.
+     * Used to derive the snapshot subdirectory
+     * (e.g., {@code main} → {@code snapshot/main/}).
+     */
+    @Parameter(property = &quot;branch&quot;)
+    private String branch;
+
+    /** Show plan without executing. */
+    @Parameter(property = &quot;dryRun&quot;, defaultValue = &quot;false&quot;)
+    private boolean dryRun;
+
+    /** Skip the {@code mvn clean verify} step. */
+    @Parameter(property = &quot;skipBuild&quot;, defaultValue = &quot;false&quot;)
+    private boolean skipBuild;
+
+    /**
+     * Skip the atomic swap (deploy directly over the live directory).
+     * Not recommended — leaves stale files from previous deploys
+     * and causes a brief window where the site is incomplete.
+     */
+    @Parameter(property = &quot;skipSwap&quot;, defaultValue = &quot;false&quot;)
+    private boolean skipSwap;
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="nc" id="L77">        File gitRoot = ReleaseSupport.gitRoot(new File(&quot;.&quot;));</span>
+<span class="nc" id="L78">        File mvnw = ReleaseSupport.resolveMavenWrapper(gitRoot, getLog());</span>
+<span class="nc" id="L79">        File rootPom = new File(gitRoot, &quot;pom.xml&quot;);</span>
+
+<span class="nc" id="L81">        String projectId = ReleaseSupport.readPomArtifactId(rootPom);</span>
+
+        // Default siteVersion from POM version
+<span class="nc bnc" id="L84" title="All 4 branches missed.">        if (siteVersion == null || siteVersion.isBlank()) {</span>
+<span class="nc" id="L85">            siteVersion = ReleaseSupport.readPomVersion(rootPom);</span>
+        }
+
+        // Default branch from git
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (branch == null || branch.isBlank()) {</span>
+<span class="nc" id="L90">            branch = ReleaseSupport.currentBranch(gitRoot);</span>
+        }
+
+        // Resolve target URL and disk path
+        String subPath;
+        String targetUrl;
+        String diskPath;
+
+<span class="nc bnc" id="L98" title="All 4 branches missed.">        switch (siteType) {</span>
+            case &quot;release&quot; -&gt; {
+<span class="nc" id="L100">                subPath = null;</span>
+<span class="nc" id="L101">                targetUrl = SITE_URL_BASE + projectId + &quot;/release&quot;;</span>
+<span class="nc" id="L102">                diskPath = ReleaseSupport.siteDiskPath(projectId, &quot;release&quot;, null);</span>
+<span class="nc" id="L103">            }</span>
+            case &quot;snapshot&quot; -&gt; {
+<span class="nc" id="L105">                String safeBranch = ReleaseSupport.branchToSitePath(branch);</span>
+<span class="nc" id="L106">                subPath = safeBranch;</span>
+<span class="nc" id="L107">                targetUrl = SITE_URL_BASE + projectId + &quot;/snapshot/&quot; + safeBranch;</span>
+<span class="nc" id="L108">                diskPath = ReleaseSupport.siteDiskPath(projectId, &quot;snapshot&quot;, safeBranch);</span>
+<span class="nc" id="L109">            }</span>
+            case &quot;checkpoint&quot; -&gt; {
+<span class="nc" id="L111">                subPath = siteVersion;</span>
+<span class="nc" id="L112">                targetUrl = SITE_URL_BASE + projectId + &quot;/checkpoint/&quot; + siteVersion;</span>
+<span class="nc" id="L113">                diskPath = ReleaseSupport.siteDiskPath(projectId, &quot;checkpoint&quot;, siteVersion);</span>
+<span class="nc" id="L114">            }</span>
+<span class="nc" id="L115">            default -&gt; throw new MojoExecutionException(</span>
+                    &quot;Invalid siteType: '&quot; + siteType +
+                            &quot;'. Must be one of: release, snapshot, checkpoint&quot;);
+        }
+
+<span class="nc" id="L120">        getLog().info(&quot;&quot;);</span>
+<span class="nc" id="L121">        getLog().info(&quot;SITE DEPLOYMENT&quot;);</span>
+<span class="nc" id="L122">        getLog().info(&quot;  Project:     &quot; + projectId);</span>
+<span class="nc" id="L123">        getLog().info(&quot;  Site type:   &quot; + siteType);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (&quot;snapshot&quot;.equals(siteType)) {</span>
+<span class="nc" id="L125">            getLog().info(&quot;  Branch:      &quot; + branch);</span>
+        }
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (&quot;checkpoint&quot;.equals(siteType)) {</span>
+<span class="nc" id="L128">            getLog().info(&quot;  Version:     &quot; + siteVersion);</span>
+        }
+<span class="nc" id="L130">        getLog().info(&quot;  Target URL:  &quot; + targetUrl);</span>
+<span class="nc" id="L131">        getLog().info(&quot;  Disk path:   &quot; + diskPath);</span>
+<span class="nc" id="L132">        getLog().info(&quot;  Skip build:  &quot; + skipBuild);</span>
+<span class="nc" id="L133">        getLog().info(&quot;  Skip swap:   &quot; + skipSwap);</span>
+<span class="nc" id="L134">        getLog().info(&quot;  Dry run:     &quot; + dryRun);</span>
+<span class="nc" id="L135">        getLog().info(&quot;&quot;);</span>
+
+        // Determine deploy URL — either staging dir or direct
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        String deployUrl = skipSwap ? targetUrl</span>
+<span class="nc" id="L139">                : ReleaseSupport.siteStagingUrl(targetUrl);</span>
+<span class="nc" id="L140">        String stagingDisk = ReleaseSupport.siteStagingPath(diskPath);</span>
+
+<span class="nc bnc" id="L142" title="All 2 branches missed.">        if (dryRun) {</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            if (!skipBuild) {</span>
+<span class="nc" id="L144">                getLog().info(&quot;[DRY RUN] Would run: mvnw clean verify -B&quot;);</span>
+            }
+<span class="nc bnc" id="L146" title="All 2 branches missed.">            if (!skipSwap) {</span>
+<span class="nc" id="L147">                getLog().info(&quot;[DRY RUN] Would clean staging dir: &quot; + stagingDisk);</span>
+<span class="nc" id="L148">                getLog().info(&quot;[DRY RUN] Would deploy site to staging: &quot; + deployUrl);</span>
+<span class="nc" id="L149">                getLog().info(&quot;[DRY RUN] Would swap: &quot; + stagingDisk + &quot; → &quot; + diskPath);</span>
+            } else {
+<span class="nc" id="L151">                getLog().info(&quot;[DRY RUN] Would deploy site to: &quot; + targetUrl);</span>
+            }
+<span class="nc" id="L153">            return;</span>
+        }
+
+        // Build first (unless skipped)
+<span class="nc bnc" id="L157" title="All 2 branches missed.">        if (!skipBuild) {</span>
+<span class="nc" id="L158">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="nc" id="L159">                    mvnw.getAbsolutePath(), &quot;clean&quot;, &quot;verify&quot;, &quot;-B&quot;);</span>
+        }
+
+<span class="nc bnc" id="L162" title="All 2 branches missed.">        if (!skipSwap) {</span>
+            // Clean any leftover staging directory
+<span class="nc" id="L164">            ReleaseSupport.cleanRemoteSiteDir(gitRoot, getLog(), stagingDisk);</span>
+        }
+
+        // Generate, stage, and deploy site (to staging dir or direct)
+<span class="nc" id="L168">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="nc" id="L169">                mvnw.getAbsolutePath(), &quot;site&quot;, &quot;site:stage&quot;, &quot;site:deploy&quot;, &quot;-B&quot;,</span>
+                &quot;-Dsite.deploy.url=&quot; + deployUrl);
+
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (!skipSwap) {</span>
+            // Atomic swap: staging → live
+<span class="nc" id="L174">            ReleaseSupport.swapRemoteSiteDir(gitRoot, getLog(), diskPath);</span>
+        }
+
+<span class="nc" id="L177">        String publicUrl = toPublicSiteUrl(targetUrl);</span>
+<span class="nc" id="L178">        getLog().info(&quot;&quot;);</span>
+<span class="nc" id="L179">        getLog().info(&quot;Site deployed to: &quot; + publicUrl);</span>
+<span class="nc" id="L180">    }</span>
+
+    // ── URL conversion (pure, static, testable) ─────────────────────
+
+    /**
+     * Convert an internal SCP-style site URL to its public HTTP equivalent.
+     *
+     * &lt;p&gt;Replaces the {@code scpexe://proxy/srv/ike-site} prefix with
+     * {@code http://ike.komet.sh}.
+     *
+     * @param scpUrl the internal deployment URL
+     * @return the public-facing URL
+     */
+    public static String toPublicSiteUrl(String scpUrl) {
+<span class="fc" id="L194">        return scpUrl.replace(&quot;scpexe://proxy/srv/ike-site&quot;, &quot;http://ike.komet.sh&quot;);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

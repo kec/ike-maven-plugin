@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>VersionSupport.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Workspace Model</a> &gt; <a href="index.source.html" class="el_package">network.ike.workspace</a> &gt; <span class="el_source">VersionSupport.java</span></div><h1>VersionSupport.java</h1><pre class="source lang-java linenums">package network.ike.workspace;
+
+/**
+ * Version manipulation for IKE workspace conventions.
+ *
+ * &lt;p&gt;Handles SNAPSHOT suffixes, branch-qualified versions, checkpoint
+ * versions, and release version derivation. Extracted from
+ * {@code ReleaseSupport} in ike-maven-plugin so these operations are
+ * testable without Maven dependencies.
+ */
+public final class VersionSupport {
+
+    private VersionSupport() {}
+
+    /**
+     * Strip {@code -SNAPSHOT} from a version string.
+     *
+     * @param version e.g. &quot;1.1.0-SNAPSHOT&quot; or &quot;1.1.0-my-feature-SNAPSHOT&quot;
+     * @return e.g. &quot;1.1.0&quot; or &quot;1.1.0-my-feature&quot;
+     */
+    public static String stripSnapshot(String version) {
+<span class="fc bfc" id="L22" title="All 2 branches covered.">        return version.endsWith(&quot;-SNAPSHOT&quot;)</span>
+<span class="fc" id="L23">                ? version.substring(0, version.length() - &quot;-SNAPSHOT&quot;.length())</span>
+<span class="fc" id="L24">                : version;</span>
+    }
+
+    /**
+     * Derive the release version from a SNAPSHOT version.
+     * Equivalent to {@link #stripSnapshot(String)}.
+     */
+    public static String deriveReleaseVersion(String snapshotVersion) {
+<span class="nc" id="L32">        return stripSnapshot(snapshotVersion);</span>
+    }
+
+    /**
+     * Derive the next SNAPSHOT version by incrementing the last numeric
+     * segment. {@code &quot;2&quot;} becomes {@code &quot;3-SNAPSHOT&quot;};
+     * {@code &quot;1.1.0&quot;} becomes {@code &quot;1.1.1-SNAPSHOT&quot;}.
+     *
+     * @param releaseVersion a version without -SNAPSHOT
+     * @return the next SNAPSHOT version
+     */
+    public static String deriveNextSnapshot(String releaseVersion) {
+<span class="fc" id="L44">        String base = stripSnapshot(releaseVersion);</span>
+<span class="fc" id="L45">        int lastDot = base.lastIndexOf('.');</span>
+<span class="fc bfc" id="L46" title="All 2 branches covered.">        if (lastDot &gt;= 0) {</span>
+<span class="fc" id="L47">            String prefix = base.substring(0, lastDot + 1);</span>
+<span class="fc" id="L48">            String last = base.substring(lastDot + 1);</span>
+<span class="fc" id="L49">            return prefix + (Integer.parseInt(last) + 1) + &quot;-SNAPSHOT&quot;;</span>
+        }
+        // Simple integer version (e.g., &quot;2&quot; -&gt; &quot;3-SNAPSHOT&quot;)
+<span class="fc" id="L52">        return (Integer.parseInt(base) + 1) + &quot;-SNAPSHOT&quot;;</span>
+    }
+
+    /**
+     * Transform a branch name into a safe directory/version qualifier.
+     * Replaces {@code /} with {@code -}.
+     *
+     * @param branch e.g. &quot;feature/shield-terminology&quot;
+     * @return e.g. &quot;feature-shield-terminology&quot;
+     */
+    public static String safeBranchName(String branch) {
+<span class="fc" id="L63">        return branch.replace('/', '-');</span>
+    }
+
+    /**
+     * Derive a branch-qualified SNAPSHOT version.
+     *
+     * &lt;p&gt;Given base version {@code &quot;1.2.0-SNAPSHOT&quot;} and branch
+     * {@code &quot;feature/my-work&quot;}, returns {@code &quot;1.2.0-feature-my-work-SNAPSHOT&quot;}.
+     *
+     * &lt;p&gt;If the branch is &quot;main&quot;, returns the base version unchanged.
+     *
+     * @param baseVersion the unqualified version (with or without -SNAPSHOT)
+     * @param branch      the git branch name
+     * @return the branch-qualified SNAPSHOT version
+     */
+    public static String branchQualifiedVersion(String baseVersion, String branch) {
+<span class="fc bfc" id="L79" title="All 2 branches covered.">        if (&quot;main&quot;.equals(branch)) {</span>
+<span class="fc bfc" id="L80" title="All 2 branches covered.">            return baseVersion.endsWith(&quot;-SNAPSHOT&quot;)</span>
+<span class="fc" id="L81">                    ? baseVersion</span>
+<span class="fc" id="L82">                    : baseVersion + &quot;-SNAPSHOT&quot;;</span>
+        }
+<span class="fc" id="L84">        String base = stripSnapshot(baseVersion);</span>
+        // Strip any existing branch qualifier: take only the numeric prefix
+<span class="fc" id="L86">        String numericBase = extractNumericBase(base);</span>
+<span class="fc" id="L87">        return numericBase + &quot;-&quot; + safeBranchName(branch) + &quot;-SNAPSHOT&quot;;</span>
+    }
+
+    /**
+     * Extract the numeric base version, stripping any branch qualifier.
+     * {@code &quot;1.2.0-my-feature&quot;} becomes {@code &quot;1.2.0&quot;};
+     * {@code &quot;1.2.0&quot;} is unchanged.
+     */
+    public static String extractNumericBase(String version) {
+        // Find the first '-' that follows a digit and precedes a letter
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (int i = 1; i &lt; version.length(); i++) {</span>
+<span class="pc bpc" id="L98" title="1 of 4 branches missed.">            if (version.charAt(i) == '-' &amp;&amp; Character.isDigit(version.charAt(i - 1))</span>
+<span class="pc bpc" id="L99" title="1 of 2 branches missed.">                    &amp;&amp; i + 1 &lt; version.length()</span>
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">                    &amp;&amp; Character.isLetter(version.charAt(i + 1))) {</span>
+<span class="fc" id="L101">                return version.substring(0, i);</span>
+            }
+        }
+<span class="fc" id="L104">        return version;</span>
+    }
+
+    /**
+     * Check whether a version string is a SNAPSHOT.
+     */
+    public static boolean isSnapshot(String version) {
+<span class="pc bpc" id="L111" title="1 of 4 branches missed.">        return version != null &amp;&amp; version.endsWith(&quot;-SNAPSHOT&quot;);</span>
+    }
+
+    /**
+     * Check whether a version string is branch-qualified
+     * (has a non-numeric qualifier before -SNAPSHOT).
+     */
+    public static boolean isBranchQualified(String version) {
+<span class="fc bfc" id="L119" title="All 2 branches covered.">        if (!isSnapshot(version)) return false;</span>
+<span class="fc" id="L120">        String base = stripSnapshot(version);</span>
+<span class="fc bfc" id="L121" title="All 2 branches covered.">        return !base.equals(extractNumericBase(base));</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

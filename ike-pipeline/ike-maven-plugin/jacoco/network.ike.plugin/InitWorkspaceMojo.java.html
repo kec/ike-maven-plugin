@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>InitWorkspaceMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">InitWorkspaceMojo.java</span></div><h1>InitWorkspaceMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import network.ike.workspace.Component;
+import network.ike.workspace.WorkspaceGraph;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Clone and initialize workspace components from the manifest.
+ *
+ * &lt;p&gt;Three initialization modes per component:
+ * &lt;ol&gt;
+ *   &lt;li&gt;&lt;b&gt;Already cloned&lt;/b&gt; — directory has {@code .git/}; skip.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Syncthing working tree&lt;/b&gt; — directory exists but no
+ *       {@code .git/}. Initializes git in-place: {@code git init},
+ *       adds the remote, fetches, and resets to match the remote branch.
+ *       This preserves file content synced from another machine.&lt;/li&gt;
+ *   &lt;li&gt;&lt;b&gt;Fresh clone&lt;/b&gt; — no directory; runs {@code git clone}.&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Components are initialized in topological (dependency) order.
+ *
+ * &lt;pre&gt;{@code
+ * mvn ike:init
+ * mvn ike:init -Dgroup=studio
+ * mvn ike:init -Dgroup=docs
+ * }&lt;/pre&gt;
+ */
+@Mojo(name = &quot;init&quot;, requiresProject = false, threadSafe = true)
+<span class="fc" id="L36">public class InitWorkspaceMojo extends AbstractWorkspaceMojo {</span>
+
+    /**
+     * Restrict to a named group (or single component). Default: all.
+     */
+    @Parameter(property = &quot;group&quot;)
+    String group;
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="fc" id="L46">        WorkspaceGraph graph = loadGraph();</span>
+<span class="fc" id="L47">        File root = workspaceRoot();</span>
+
+        Set&lt;String&gt; targets;
+<span class="pc bpc" id="L50" title="1 of 4 branches missed.">        if (group != null &amp;&amp; !group.isEmpty()) {</span>
+<span class="fc" id="L51">            targets = graph.expandGroup(group);</span>
+        } else {
+<span class="fc" id="L53">            targets = graph.manifest().components().keySet();</span>
+        }
+
+        // Sort in dependency order
+<span class="fc" id="L57">        List&lt;String&gt; sorted = graph.topologicalSort(new LinkedHashSet&lt;&gt;(targets));</span>
+
+<span class="fc" id="L59">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L60">        getLog().info(&quot;IKE Workspace — Init&quot;);</span>
+<span class="fc" id="L61">        getLog().info(&quot;══════════════════════════════════════════════════════════════&quot;);</span>
+<span class="fc bfc" id="L62" title="All 2 branches covered.">        getLog().info(&quot;  Target: &quot; + (group != null ? group : &quot;all&quot;)</span>
+<span class="fc" id="L63">                + &quot; (&quot; + sorted.size() + &quot; components)&quot;);</span>
+<span class="fc" id="L64">        getLog().info(&quot;  Root:   &quot; + root.getAbsolutePath());</span>
+<span class="fc" id="L65">        getLog().info(&quot;&quot;);</span>
+
+<span class="fc" id="L67">        int cloned = 0;</span>
+<span class="fc" id="L68">        int syncthing = 0;</span>
+<span class="fc" id="L69">        int skipped = 0;</span>
+
+<span class="fc bfc" id="L71" title="All 2 branches covered.">        for (String name : sorted) {</span>
+<span class="fc" id="L72">            Component component = graph.manifest().components().get(name);</span>
+<span class="fc" id="L73">            File dir = new File(root, name);</span>
+<span class="fc" id="L74">            File gitDir = new File(dir, &quot;.git&quot;);</span>
+
+<span class="fc bfc" id="L76" title="All 2 branches covered.">            if (gitDir.exists()) {</span>
+                // Already a git repo
+<span class="fc" id="L78">                getLog().info(&quot;  ✓ &quot; + name + &quot; — already initialized&quot;);</span>
+<span class="fc" id="L79">                skipped++;</span>
+<span class="fc" id="L80">                continue;</span>
+            }
+
+<span class="fc" id="L83">            String repo = component.repo();</span>
+<span class="fc" id="L84">            String branch = component.branch();</span>
+
+<span class="pc bpc" id="L86" title="2 of 4 branches missed.">            if (repo == null || repo.isEmpty()) {</span>
+<span class="nc" id="L87">                getLog().warn(&quot;  ⚠ &quot; + name + &quot; — no repo URL, skipping&quot;);</span>
+<span class="nc" id="L88">                continue;</span>
+            }
+
+<span class="pc bpc" id="L91" title="1 of 2 branches missed.">            if (dir.exists()) {</span>
+                // Syncthing working tree — init git in-place
+<span class="nc" id="L93">                getLog().info(&quot;  ↻ &quot; + name</span>
+                        + &quot; — initializing git in existing directory (Syncthing)&quot;);
+<span class="nc" id="L95">                initSyncthingRepo(dir, repo, branch);</span>
+<span class="nc" id="L96">                syncthing++;</span>
+            } else {
+                // Fresh clone
+<span class="fc" id="L99">                getLog().info(&quot;  ↓ &quot; + name + &quot; — cloning from &quot; + repo);</span>
+<span class="fc" id="L100">                cloneRepo(root, name, repo, branch);</span>
+<span class="fc" id="L101">                cloned++;</span>
+            }
+<span class="fc" id="L103">        }</span>
+
+<span class="fc" id="L105">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L106">        getLog().info(&quot;  Done: &quot; + cloned + &quot; cloned, &quot; + syncthing</span>
+                + &quot; Syncthing-initialized, &quot; + skipped + &quot; already present&quot;);
+<span class="fc" id="L108">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L109">    }</span>
+
+    /**
+     * Initialize a git repo inside an existing directory (Syncthing case).
+     * The directory has files but no .git — we init, add remote, fetch,
+     * and reset to match the remote branch without overwriting working-tree files.
+     */
+    private void initSyncthingRepo(File dir, String repo, String branch)
+            throws MojoExecutionException {
+<span class="nc" id="L118">        ReleaseSupport.exec(dir, getLog(), &quot;git&quot;, &quot;init&quot;);</span>
+<span class="nc" id="L119">        ReleaseSupport.exec(dir, getLog(), &quot;git&quot;, &quot;remote&quot;, &quot;add&quot;, &quot;origin&quot;, repo);</span>
+<span class="nc" id="L120">        ReleaseSupport.exec(dir, getLog(), &quot;git&quot;, &quot;fetch&quot;, &quot;origin&quot;, branch);</span>
+        // Mixed reset: updates HEAD and index to match remote, keeps working tree
+<span class="nc" id="L122">        ReleaseSupport.exec(dir, getLog(),</span>
+                &quot;git&quot;, &quot;reset&quot;, &quot;origin/&quot; + branch);
+<span class="nc" id="L124">    }</span>
+
+    /**
+     * Standard git clone into a new directory.
+     */
+    private void cloneRepo(File root, String name, String repo, String branch)
+            throws MojoExecutionException {
+<span class="fc" id="L131">        ReleaseSupport.exec(root, getLog(),</span>
+                &quot;git&quot;, &quot;clone&quot;, &quot;-b&quot;, branch, repo, name);
+<span class="fc" id="L133">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ComponentSnapshot.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">ComponentSnapshot.java</span></div><h1>ComponentSnapshot.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+/**
+ * Immutable snapshot of a single workspace component at checkpoint time.
+ *
+ * &lt;p&gt;Decouples checkpoint YAML generation from git subprocess calls
+ * so the formatting logic is testable with plain records.
+ *
+ * @param name    component directory name
+ * @param sha     full commit SHA (or &quot;unknown&quot; if unavailable)
+ * @param shortSha abbreviated commit SHA
+ * @param branch  current branch name
+ * @param version POM version (may be null)
+ * @param dirty   true if working tree has uncommitted changes
+ * @param type    component type from workspace manifest
+ * @param compositeCheckpoint true if checkpoint mechanism is &quot;composite&quot;
+ */
+<span class="fc" id="L18">public record ComponentSnapshot(String name, String sha, String shortSha,</span>
+                                 String branch, String version, boolean dirty,
+                                 String type, boolean compositeCheckpoint) {}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

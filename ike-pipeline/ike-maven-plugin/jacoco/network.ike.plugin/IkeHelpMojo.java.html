@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>IkeHelpMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">IkeHelpMojo.java</span></div><h1>IkeHelpMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+
+/**
+ * Displays available IKE build tool goals.
+ *
+ * @see &lt;a href=&quot;https://github.com/IKE-Network/ike-pipeline&quot;&gt;IKE Pipeline&lt;/a&gt;
+ */
+@Mojo(name = &quot;help&quot;, requiresProject = false, threadSafe = true)
+<span class="fc" id="L13">public class IkeHelpMojo extends AbstractMojo {</span>
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="fc" id="L17">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L18">        getLog().info(&quot;IKE Build Tools — Available Goals&quot;);</span>
+<span class="fc" id="L19">        getLog().info(&quot;══════════════════════════════════════════════════════════════&quot;);</span>
+<span class="fc" id="L20">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L21">        getLog().info(&quot;  ── Workspace Goals ──────────────────────────────────────&quot;);</span>
+<span class="fc" id="L22">        getLog().info(&quot;  ike:dashboard                                   Composite overview (verify+status+cascade)&quot;);</span>
+<span class="fc" id="L23">        getLog().info(&quot;  ike:status                                      Git status across all repos&quot;);</span>
+<span class="fc" id="L24">        getLog().info(&quot;  ike:verify                                      Check manifest consistency&quot;);</span>
+<span class="fc" id="L25">        getLog().info(&quot;  ike:cascade                                     Show downstream impact of a change&quot;);</span>
+<span class="fc" id="L26">        getLog().info(&quot;  ike:graph                                       Print dependency graph&quot;);</span>
+<span class="fc" id="L27">        getLog().info(&quot;  ike:init                                        Clone/initialize repos from manifest&quot;);</span>
+<span class="fc" id="L28">        getLog().info(&quot;  ike:pull                                        Git pull --rebase across repos&quot;);</span>
+<span class="fc" id="L29">        getLog().info(&quot;  ike:stignore                                    Generate .stignore for Syncthing&quot;);</span>
+<span class="fc" id="L30">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L31">        getLog().info(&quot;  ── Gitflow Goals ────────────────────────────────────────&quot;);</span>
+<span class="fc" id="L32">        getLog().info(&quot;  ike:feature-start                               Create feature branch across repos&quot;);</span>
+<span class="fc" id="L33">        getLog().info(&quot;  ike:feature-finish                              Merge feature branch to main&quot;);</span>
+<span class="fc" id="L34">        getLog().info(&quot;  ike:ws-checkpoint                               Record multi-repo checkpoint (SHAs+versions)&quot;);</span>
+<span class="fc" id="L35">        getLog().info(&quot;  ike:ws-release                                  Release all dirty components in topo order&quot;);</span>
+<span class="fc" id="L36">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L37">        getLog().info(&quot;  ── Release Goals ────────────────────────────────────────&quot;);</span>
+<span class="fc" id="L38">        getLog().info(&quot;  ike:help                                        This help message&quot;);</span>
+<span class="fc" id="L39">        getLog().info(&quot;  ike:release                                     Full release + bump to next SNAPSHOT&quot;);</span>
+<span class="fc" id="L40">        getLog().info(&quot;  ike:generate-bom                                Auto-generate BOM from ike-parent&quot;);</span>
+<span class="fc" id="L41">        getLog().info(&quot;  ike:checkpoint                                  Create single-repo immutable checkpoint&quot;);</span>
+<span class="fc" id="L42">        getLog().info(&quot;  ike:deploy-site                                 Deploy site to versioned URL&quot;);</span>
+<span class="fc" id="L43">        getLog().info(&quot;  ike:clean-site                                  Remove a deployed site from the server&quot;);</span>
+<span class="fc" id="L44">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L45">        getLog().info(&quot;Options for workspace goals:&quot;);</span>
+<span class="fc" id="L46">        getLog().info(&quot;  -Dworkspace.manifest=&lt;path&gt;  Path to workspace.yaml (auto-detected)&quot;);</span>
+<span class="fc" id="L47">        getLog().info(&quot;  -Dgroup=&lt;name&gt;               Restrict to group (status, init, pull)&quot;);</span>
+<span class="fc" id="L48">        getLog().info(&quot;  -Dcomponent=&lt;name&gt;           Component for ike:cascade (required)&quot;);</span>
+<span class="fc" id="L49">        getLog().info(&quot;  -Dformat=dot                 Graphviz DOT output for ike:graph&quot;);</span>
+<span class="fc" id="L50">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L51">        getLog().info(&quot;Options for gitflow goals:&quot;);</span>
+<span class="fc" id="L52">        getLog().info(&quot;  -Dfeature=&lt;name&gt;       Feature name (branch: feature/&lt;name&gt;)&quot;);</span>
+<span class="fc" id="L53">        getLog().info(&quot;  -Dgroup=&lt;name&gt;         Restrict to group&quot;);</span>
+<span class="fc" id="L54">        getLog().info(&quot;  -DskipVersion=true     Skip POM version qualification (feature-start)&quot;);</span>
+<span class="fc" id="L55">        getLog().info(&quot;  -DtargetBranch=&lt;name&gt;  Merge target (default: main)&quot;);</span>
+<span class="fc" id="L56">        getLog().info(&quot;  -Dpush=true            Push to origin after merge/tag&quot;);</span>
+<span class="fc" id="L57">        getLog().info(&quot;  -DdryRun=true          Show plan without executing&quot;);</span>
+<span class="fc" id="L58">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L59">        getLog().info(&quot;Options for ike:ws-checkpoint:&quot;);</span>
+<span class="fc" id="L60">        getLog().info(&quot;  -Dname=&lt;name&gt;          Checkpoint name (required)&quot;);</span>
+<span class="fc" id="L61">        getLog().info(&quot;  -Dtag=true             Tag each component&quot;);</span>
+<span class="fc" id="L62">        getLog().info(&quot;  -Dpush=true            Push tags to origin&quot;);</span>
+<span class="fc" id="L63">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L64">        getLog().info(&quot;Options for ike:ws-release:&quot;);</span>
+<span class="fc" id="L65">        getLog().info(&quot;  -Dcomponent=&lt;name&gt;     Release one specific component&quot;);</span>
+<span class="fc" id="L66">        getLog().info(&quot;  -Dgroup=&lt;name&gt;         Restrict to components in group&quot;);</span>
+<span class="fc" id="L67">        getLog().info(&quot;  -DdryRun=true          Show what would be released&quot;);</span>
+<span class="fc" id="L68">        getLog().info(&quot;  -Dpush=true            Push releases to origin (default: true)&quot;);</span>
+<span class="fc" id="L69">        getLog().info(&quot;  -DskipCheckpoint=true  Skip pre-release checkpoint&quot;);</span>
+<span class="fc" id="L70">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L71">        getLog().info(&quot;Options for ike:release:&quot;);</span>
+<span class="fc" id="L72">        getLog().info(&quot;  -DreleaseVersion=&lt;v&gt;   Version to release (auto-derived from POM)&quot;);</span>
+<span class="fc" id="L73">        getLog().info(&quot;  -DnextVersion=&lt;v&gt;      Next SNAPSHOT (auto-derived)&quot;);</span>
+<span class="fc" id="L74">        getLog().info(&quot;  -DdryRun=true          Show plan without executing&quot;);</span>
+<span class="fc" id="L75">        getLog().info(&quot;  -DskipVerify=true      Skip 'mvnw clean verify'&quot;);</span>
+<span class="fc" id="L76">        getLog().info(&quot;  -DallowBranch=&lt;name&gt;   Allow release from non-main branch&quot;);</span>
+<span class="fc" id="L77">        getLog().info(&quot;  -DdeploySite=false     Skip site deployment&quot;);</span>
+<span class="fc" id="L78">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L79">        getLog().info(&quot;Options for ike:checkpoint:&quot;);</span>
+<span class="fc" id="L80">        getLog().info(&quot;  -DdryRun=true          Show plan without executing&quot;);</span>
+<span class="fc" id="L81">        getLog().info(&quot;  -DskipVerify=true      Skip 'mvnw clean verify'&quot;);</span>
+<span class="fc" id="L82">        getLog().info(&quot;  -DdeploySite=false     Skip site deployment&quot;);</span>
+<span class="fc" id="L83">        getLog().info(&quot;  -DcheckpointLabel=&lt;v&gt;  Custom checkpoint version label&quot;);</span>
+<span class="fc" id="L84">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L85">        getLog().info(&quot;Options for ike:deploy-site:&quot;);</span>
+<span class="fc" id="L86">        getLog().info(&quot;  -DsiteType=&lt;type&gt;      One of: release, snapshot, checkpoint&quot;);</span>
+<span class="fc" id="L87">        getLog().info(&quot;  -Dbranch=&lt;name&gt;        Branch for snapshot path (auto-detected)&quot;);</span>
+<span class="fc" id="L88">        getLog().info(&quot;  -DsiteVersion=&lt;v&gt;      Version for checkpoint URL path&quot;);</span>
+<span class="fc" id="L89">        getLog().info(&quot;  -DdryRun=true          Show plan without executing&quot;);</span>
+<span class="fc" id="L90">        getLog().info(&quot;  -DskipBuild=true       Skip 'mvnw clean verify'&quot;);</span>
+<span class="fc" id="L91">        getLog().info(&quot;  -DskipSwap=true        Deploy directly (no atomic swap)&quot;);</span>
+<span class="fc" id="L92">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L93">        getLog().info(&quot;Options for ike:clean-site:&quot;);</span>
+<span class="fc" id="L94">        getLog().info(&quot;  -DsiteType=&lt;type&gt;      One of: release, snapshot, checkpoint&quot;);</span>
+<span class="fc" id="L95">        getLog().info(&quot;  -Dbranch=&lt;name&gt;        Branch for snapshot (auto-detected)&quot;);</span>
+<span class="fc" id="L96">        getLog().info(&quot;  -DsiteVersion=&lt;v&gt;      Version for checkpoint cleanup&quot;);</span>
+<span class="fc" id="L97">        getLog().info(&quot;  -DdryRun=true          Show plan without executing&quot;);</span>
+<span class="fc" id="L98">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L99">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

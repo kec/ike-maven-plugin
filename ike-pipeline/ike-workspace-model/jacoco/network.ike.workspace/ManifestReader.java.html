@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ManifestReader.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Workspace Model</a> &gt; <a href="index.source.html" class="el_package">network.ike.workspace</a> &gt; <span class="el_source">ManifestReader.java</span></div><h1>ManifestReader.java</h1><pre class="source lang-java linenums">package network.ike.workspace;
+
+import org.yaml.snakeyaml.Yaml;
+
+import java.io.IOException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Reads a {@code workspace.yaml} file into a typed {@link Manifest}.
+ *
+ * &lt;p&gt;SnakeYAML parses into raw Maps; this class maps the untyped
+ * structure onto immutable Java records with validation.
+ */
+public final class ManifestReader {
+
+    private ManifestReader() {}
+
+    /**
+     * Read a workspace manifest from the given YAML file path.
+     *
+     * @param path path to workspace.yaml
+     * @return the parsed manifest
+     * @throws ManifestException if the file cannot be read or has invalid structure
+     */
+    public static Manifest read(Path path) {
+<span class="fc" id="L33">        try (Reader reader = Files.newBufferedReader(path)) {</span>
+<span class="fc" id="L34">            return read(reader);</span>
+<span class="nc" id="L35">        } catch (IOException e) {</span>
+<span class="nc" id="L36">            throw new ManifestException(&quot;Cannot read &quot; + path, e);</span>
+        }
+    }
+
+    /**
+     * Read a workspace manifest from a Reader (useful for testing).
+     *
+     * @param reader YAML source
+     * @return the parsed manifest
+     * @throws ManifestException if the YAML has invalid structure
+     */
+    public static Manifest read(Reader reader) {
+<span class="fc" id="L48">        Yaml yaml = new Yaml();</span>
+<span class="fc" id="L49">        Map&lt;String, Object&gt; root = yaml.load(reader);</span>
+<span class="fc bfc" id="L50" title="All 2 branches covered.">        if (root == null) {</span>
+<span class="fc" id="L51">            throw new ManifestException(&quot;Empty manifest&quot;);</span>
+        }
+<span class="fc" id="L53">        return parseManifest(root);</span>
+    }
+
+    private static Manifest parseManifest(Map&lt;String, Object&gt; root) {
+<span class="fc" id="L57">        String schemaVersion = stringField(root, &quot;schema-version&quot;, &quot;1.0&quot;);</span>
+<span class="fc" id="L58">        String generated = stringField(root, &quot;generated&quot;, null);</span>
+
+<span class="fc" id="L60">        Defaults defaults = parseDefaults(mapField(root, &quot;defaults&quot;));</span>
+<span class="fc" id="L61">        Map&lt;String, ComponentType&gt; componentTypes = parseComponentTypes(</span>
+<span class="fc" id="L62">                mapField(root, &quot;component-types&quot;));</span>
+<span class="fc" id="L63">        Map&lt;String, Component&gt; components = parseComponents(</span>
+<span class="fc" id="L64">                mapField(root, &quot;components&quot;), defaults);</span>
+<span class="fc" id="L65">        Map&lt;String, List&lt;String&gt;&gt; groups = parseGroups(mapField(root, &quot;groups&quot;));</span>
+
+<span class="fc" id="L67">        return new Manifest(schemaVersion, generated, defaults,</span>
+                componentTypes, components, groups);
+    }
+
+    private static Defaults parseDefaults(Map&lt;String, Object&gt; map) {
+<span class="fc bfc" id="L72" title="All 2 branches covered.">        if (map == null) {</span>
+<span class="fc" id="L73">            return new Defaults(&quot;main&quot;);</span>
+        }
+<span class="fc" id="L75">        return new Defaults(stringField(map, &quot;branch&quot;, &quot;main&quot;));</span>
+    }
+
+    private static Map&lt;String, ComponentType&gt; parseComponentTypes(
+            Map&lt;String, Object&gt; map) {
+<span class="fc bfc" id="L80" title="All 2 branches covered.">        if (map == null) {</span>
+<span class="fc" id="L81">            return Map.of();</span>
+        }
+<span class="fc" id="L83">        Map&lt;String, ComponentType&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L84" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L85">            String name = entry.getKey();</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L87">            Map&lt;String, Object&gt; fields = (Map&lt;String, Object&gt;) entry.getValue();</span>
+<span class="fc" id="L88">            result.put(name, new ComponentType(</span>
+                    name,
+<span class="fc" id="L90">                    stringField(fields, &quot;description&quot;, &quot;&quot;),</span>
+<span class="fc" id="L91">                    stringField(fields, &quot;build-command&quot;, &quot;mvn clean install&quot;),</span>
+<span class="fc" id="L92">                    stringField(fields, &quot;checkpoint-mechanism&quot;, &quot;git-tag&quot;)</span>
+            ));
+<span class="fc" id="L94">        }</span>
+<span class="fc" id="L95">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static Map&lt;String, Component&gt; parseComponents(
+            Map&lt;String, Object&gt; map, Defaults defaults) {
+<span class="pc bpc" id="L100" title="1 of 2 branches missed.">        if (map == null) {</span>
+<span class="nc" id="L101">            return Map.of();</span>
+        }
+<span class="fc" id="L103">        Map&lt;String, Component&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L104" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+<span class="fc" id="L105">            String name = entry.getKey();</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L107">            Map&lt;String, Object&gt; fields = (Map&lt;String, Object&gt;) entry.getValue();</span>
+<span class="fc" id="L108">            result.put(name, parseComponent(name, fields, defaults));</span>
+<span class="fc" id="L109">        }</span>
+<span class="fc" id="L110">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    private static Component parseComponent(String name,
+                                             Map&lt;String, Object&gt; fields,
+                                             Defaults defaults) {
+<span class="fc" id="L116">        String branch = stringField(fields, &quot;branch&quot;, defaults.branch());</span>
+<span class="fc" id="L117">        String version = stringField(fields, &quot;version&quot;, null);</span>
+        // SnakeYAML reads YAML ~ (null) as Java null — handle it
+<span class="pc bpc" id="L119" title="1 of 2 branches missed.">        if (&quot;~&quot;.equals(version)) {</span>
+<span class="nc" id="L120">            version = null;</span>
+        }
+
+        @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L124">        List&lt;Map&lt;String, Object&gt;&gt; depsRaw =</span>
+<span class="fc" id="L125">                (List&lt;Map&lt;String, Object&gt;&gt;) fields.get(&quot;depends-on&quot;);</span>
+<span class="fc" id="L126">        List&lt;Dependency&gt; deps = parseDependencies(depsRaw);</span>
+
+<span class="fc" id="L128">        return new Component(</span>
+                name,
+<span class="fc" id="L130">                stringField(fields, &quot;type&quot;, &quot;software&quot;),</span>
+<span class="fc" id="L131">                stringField(fields, &quot;description&quot;, &quot;&quot;),</span>
+<span class="fc" id="L132">                stringField(fields, &quot;repo&quot;, &quot;&quot;),</span>
+                branch,
+                version,
+<span class="fc" id="L135">                stringField(fields, &quot;groupId&quot;, &quot;&quot;),</span>
+                deps,
+<span class="fc" id="L137">                stringField(fields, &quot;notes&quot;, null)</span>
+        );
+    }
+
+    private static List&lt;Dependency&gt; parseDependencies(
+            List&lt;Map&lt;String, Object&gt;&gt; raw) {
+<span class="fc bfc" id="L143" title="All 4 branches covered.">        if (raw == null || raw.isEmpty()) {</span>
+<span class="fc" id="L144">            return List.of();</span>
+        }
+<span class="fc" id="L146">        List&lt;Dependency&gt; result = new ArrayList&lt;&gt;(raw.size());</span>
+<span class="fc bfc" id="L147" title="All 2 branches covered.">        for (Map&lt;String, Object&gt; entry : raw) {</span>
+<span class="fc" id="L148">            result.add(new Dependency(</span>
+<span class="fc" id="L149">                    stringField(entry, &quot;component&quot;, &quot;&quot;),</span>
+<span class="fc" id="L150">                    stringField(entry, &quot;relationship&quot;, &quot;build&quot;)</span>
+            ));
+<span class="fc" id="L152">        }</span>
+<span class="fc" id="L153">        return Collections.unmodifiableList(result);</span>
+    }
+
+    private static Map&lt;String, List&lt;String&gt;&gt; parseGroups(
+            Map&lt;String, Object&gt; map) {
+<span class="fc bfc" id="L158" title="All 2 branches covered.">        if (map == null) {</span>
+<span class="fc" id="L159">            return Map.of();</span>
+        }
+<span class="fc" id="L161">        Map&lt;String, List&lt;String&gt;&gt; result = new LinkedHashMap&lt;&gt;();</span>
+<span class="fc bfc" id="L162" title="All 2 branches covered.">        for (Map.Entry&lt;String, Object&gt; entry : map.entrySet()) {</span>
+            @SuppressWarnings(&quot;unchecked&quot;)
+<span class="fc" id="L164">            List&lt;String&gt; members = (List&lt;String&gt;) entry.getValue();</span>
+<span class="fc" id="L165">            result.put(entry.getKey(),</span>
+<span class="pc bpc" id="L166" title="1 of 2 branches missed.">                    members == null ? List.of() : List.copyOf(members));</span>
+<span class="fc" id="L167">        }</span>
+<span class="fc" id="L168">        return Collections.unmodifiableMap(result);</span>
+    }
+
+    @SuppressWarnings(&quot;unchecked&quot;)
+    private static Map&lt;String, Object&gt; mapField(Map&lt;String, Object&gt; map,
+                                                 String key) {
+<span class="fc" id="L174">        Object value = map.get(key);</span>
+<span class="fc bfc" id="L175" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L176">            return null;</span>
+        }
+<span class="fc" id="L178">        return (Map&lt;String, Object&gt;) value;</span>
+    }
+
+    private static String stringField(Map&lt;String, Object&gt; map, String key,
+                                       String defaultValue) {
+<span class="fc" id="L183">        Object value = map.get(key);</span>
+<span class="fc bfc" id="L184" title="All 2 branches covered.">        if (value == null) {</span>
+<span class="fc" id="L185">            return defaultValue;</span>
+        }
+<span class="fc" id="L187">        return value.toString();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FeatureStartMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">FeatureStartMojo.java</span></div><h1>FeatureStartMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import network.ike.workspace.Component;
+import network.ike.workspace.VersionSupport;
+import network.ike.workspace.WorkspaceGraph;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+/**
+ * Start a coordinated feature branch across workspace components.
+ *
+ * &lt;p&gt;Creates a feature branch with a consistent name across the
+ * specified components (or group), optionally setting branch-qualified
+ * SNAPSHOT versions in each POM.
+ *
+ * &lt;p&gt;&lt;strong&gt;What it does, per component:&lt;/strong&gt;&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;Validates the working tree is clean&lt;/li&gt;
+ *   &lt;li&gt;Creates branch {@code feature/&lt;name&gt;} from the current HEAD&lt;/li&gt;
+ *   &lt;li&gt;If the component has a Maven version, sets a branch-qualified
+ *       version (e.g., {@code 1.2.0-my-feature-SNAPSHOT})&lt;/li&gt;
+ *   &lt;li&gt;Commits the version change&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Components are processed in topological order so that upstream
+ * dependencies get their new versions first.
+ *
+ * &lt;pre&gt;{@code
+ * mvn ike:feature-start -Dfeature=shield-terminology -Dgroup=core
+ * mvn ike:feature-start -Dfeature=kec-march-25 -Dgroup=studio
+ * mvn ike:feature-start -Dfeature=doc-refresh -Dgroup=docs -DskipVersion=true
+ * }&lt;/pre&gt;
+ */
+@Mojo(name = &quot;feature-start&quot;, requiresProject = false, threadSafe = true)
+<span class="fc" id="L42">public class FeatureStartMojo extends AbstractWorkspaceMojo {</span>
+
+    /** Feature name. Branch will be {@code feature/&lt;name&gt;}. Prompted if omitted. */
+    @Parameter(property = &quot;feature&quot;)
+    String feature;
+
+    /** Restrict to a named group or component. Default: all cloned. */
+    @Parameter(property = &quot;group&quot;)
+    String group;
+
+    /**
+     * Skip POM version qualification. Useful for document projects
+     * that don't have versioned artifacts.
+     */
+    @Parameter(property = &quot;skipVersion&quot;, defaultValue = &quot;false&quot;)
+    boolean skipVersion;
+
+    /** Show plan without executing. */
+    @Parameter(property = &quot;dryRun&quot;, defaultValue = &quot;false&quot;)
+    boolean dryRun;
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="fc" id="L65">        feature = requireParam(feature, &quot;feature&quot;, &quot;Feature name (branch will be feature/&lt;name&gt;)&quot;);</span>
+
+<span class="fc" id="L67">        WorkspaceGraph graph = loadGraph();</span>
+<span class="fc" id="L68">        File root = workspaceRoot();</span>
+
+<span class="fc" id="L70">        String branchName = &quot;feature/&quot; + feature;</span>
+
+        Set&lt;String&gt; targets;
+<span class="pc bpc" id="L73" title="1 of 4 branches missed.">        if (group != null &amp;&amp; !group.isEmpty()) {</span>
+<span class="fc" id="L74">            targets = graph.expandGroup(group);</span>
+        } else {
+<span class="fc" id="L76">            targets = graph.manifest().components().keySet();</span>
+        }
+
+<span class="fc" id="L79">        List&lt;String&gt; sorted = graph.topologicalSort(new LinkedHashSet&lt;&gt;(targets));</span>
+
+<span class="fc" id="L81">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L82">        getLog().info(&quot;IKE Workspace — Feature Start&quot;);</span>
+<span class="fc" id="L83">        getLog().info(&quot;══════════════════════════════════════════════════════════════&quot;);</span>
+<span class="fc" id="L84">        getLog().info(&quot;  Feature: &quot; + feature);</span>
+<span class="fc" id="L85">        getLog().info(&quot;  Branch:  &quot; + branchName);</span>
+<span class="fc bfc" id="L86" title="All 2 branches covered.">        getLog().info(&quot;  Scope:   &quot; + (group != null ? group : &quot;all&quot;)</span>
+<span class="fc" id="L87">                + &quot; (&quot; + sorted.size() + &quot; components)&quot;);</span>
+<span class="fc bfc" id="L88" title="All 2 branches covered.">        if (dryRun) {</span>
+<span class="fc" id="L89">            getLog().info(&quot;  Mode:    DRY RUN&quot;);</span>
+        }
+<span class="fc" id="L91">        getLog().info(&quot;&quot;);</span>
+
+<span class="fc" id="L93">        List&lt;String&gt; created = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L94">        List&lt;String&gt; skippedNotCloned = new ArrayList&lt;&gt;();</span>
+<span class="fc" id="L95">        List&lt;String&gt; skippedAlreadyOnBranch = new ArrayList&lt;&gt;();</span>
+
+<span class="fc bfc" id="L97" title="All 2 branches covered.">        for (String name : sorted) {</span>
+<span class="fc" id="L98">            Component component = graph.manifest().components().get(name);</span>
+<span class="fc" id="L99">            File dir = new File(root, name);</span>
+<span class="fc" id="L100">            File gitDir = new File(dir, &quot;.git&quot;);</span>
+
+<span class="pc bpc" id="L102" title="1 of 2 branches missed.">            if (!gitDir.exists()) {</span>
+<span class="nc" id="L103">                skippedNotCloned.add(name);</span>
+<span class="nc" id="L104">                getLog().info(&quot;  ⚠ &quot; + name + &quot; — not cloned, skipping&quot;);</span>
+<span class="nc" id="L105">                continue;</span>
+            }
+
+            // Check if already on target branch
+<span class="fc" id="L109">            String currentBranch = gitBranch(dir);</span>
+<span class="pc bpc" id="L110" title="1 of 2 branches missed.">            if (currentBranch.equals(branchName)) {</span>
+<span class="nc" id="L111">                skippedAlreadyOnBranch.add(name);</span>
+<span class="nc" id="L112">                getLog().info(&quot;  ✓ &quot; + name + &quot; — already on &quot; + branchName);</span>
+<span class="nc" id="L113">                continue;</span>
+            }
+
+            // Validate clean worktree
+<span class="fc" id="L117">            String status = gitStatus(dir);</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (!status.isEmpty()) {</span>
+<span class="nc" id="L119">                throw new MojoExecutionException(</span>
+                        name + &quot; has uncommitted changes. Commit or stash before starting a feature.&quot;);
+            }
+
+<span class="fc bfc" id="L123" title="All 2 branches covered.">            if (dryRun) {</span>
+<span class="fc" id="L124">                String versionInfo = &quot;&quot;;</span>
+<span class="pc bpc" id="L125" title="2 of 4 branches missed.">                if (!skipVersion &amp;&amp; component.version() != null) {</span>
+<span class="fc" id="L126">                    String newVersion = VersionSupport.branchQualifiedVersion(</span>
+<span class="fc" id="L127">                            component.version(), branchName);</span>
+<span class="fc" id="L128">                    versionInfo = &quot; → &quot; + newVersion;</span>
+                }
+<span class="fc" id="L130">                getLog().info(&quot;  [dry-run] &quot; + name + &quot; — would create &quot;</span>
+                        + branchName + versionInfo);
+<span class="fc" id="L132">                created.add(name);</span>
+<span class="fc" id="L133">                continue;</span>
+            }
+
+            // Create branch
+<span class="fc" id="L137">            getLog().info(&quot;  → &quot; + name + &quot; — creating &quot; + branchName);</span>
+<span class="fc" id="L138">            ReleaseSupport.exec(dir, getLog(),</span>
+                    &quot;git&quot;, &quot;checkout&quot;, &quot;-b&quot;, branchName);
+
+            // Set branch-qualified version if applicable
+<span class="pc bpc" id="L142" title="1 of 4 branches missed.">            if (!skipVersion &amp;&amp; component.version() != null</span>
+<span class="pc bpc" id="L143" title="1 of 2 branches missed.">                    &amp;&amp; !component.version().isEmpty()) {</span>
+<span class="fc" id="L144">                String newVersion = VersionSupport.branchQualifiedVersion(</span>
+<span class="fc" id="L145">                        component.version(), branchName);</span>
+<span class="fc" id="L146">                getLog().info(&quot;    version: &quot; + component.version()</span>
+                        + &quot; → &quot; + newVersion);
+
+<span class="fc" id="L149">                setPomVersion(dir, component.version(), newVersion);</span>
+<span class="fc" id="L150">                ReleaseSupport.exec(dir, getLog(),</span>
+                        &quot;git&quot;, &quot;add&quot;, &quot;pom.xml&quot;);
+<span class="fc" id="L152">                ReleaseSupport.exec(dir, getLog(),</span>
+                        &quot;git&quot;, &quot;commit&quot;, &quot;-m&quot;,
+                        &quot;feature: set version &quot; + newVersion
+                                + &quot; for &quot; + branchName);
+            }
+
+<span class="fc" id="L158">            created.add(name);</span>
+<span class="fc" id="L159">        }</span>
+
+<span class="fc" id="L161">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L162">        getLog().info(&quot;  Created: &quot; + created.size()</span>
+<span class="fc" id="L163">                + &quot; | Already on branch: &quot; + skippedAlreadyOnBranch.size()</span>
+<span class="fc" id="L164">                + &quot; | Not cloned: &quot; + skippedNotCloned.size());</span>
+<span class="fc" id="L165">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L166">    }</span>
+
+    /**
+     * Set the POM version, handling both simple and multi-module projects.
+     * Uses ReleaseSupport's POM manipulation which skips the parent block.
+     */
+    private void setPomVersion(File dir, String oldVersion, String newVersion)
+            throws MojoExecutionException {
+<span class="fc" id="L174">        File pom = new File(dir, &quot;pom.xml&quot;);</span>
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (!pom.exists()) {</span>
+<span class="nc" id="L176">            getLog().warn(&quot;    No pom.xml found in &quot; + dir.getName());</span>
+<span class="nc" id="L177">            return;</span>
+        }
+
+        // Set version in root POM
+<span class="fc" id="L181">        ReleaseSupport.setPomVersion(pom, oldVersion, newVersion);</span>
+
+        // Also update any submodule POMs that reference the old version
+        // in their &lt;parent&gt; block (for multi-module projects)
+        try {
+<span class="fc" id="L186">            List&lt;File&gt; allPoms = ReleaseSupport.findPomFiles(dir);</span>
+<span class="fc bfc" id="L187" title="All 2 branches covered.">            for (File subPom : allPoms) {</span>
+<span class="pc bpc" id="L188" title="1 of 2 branches missed.">                if (subPom.equals(pom)) continue;</span>
+                try {
+<span class="nc" id="L190">                    String content = java.nio.file.Files.readString(</span>
+<span class="nc" id="L191">                            subPom.toPath(), java.nio.charset.StandardCharsets.UTF_8);</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                    if (content.contains(&quot;&lt;version&gt;&quot; + oldVersion + &quot;&lt;/version&gt;&quot;)) {</span>
+<span class="nc" id="L193">                        String updated = content.replace(</span>
+                                &quot;&lt;version&gt;&quot; + oldVersion + &quot;&lt;/version&gt;&quot;,
+                                &quot;&lt;version&gt;&quot; + newVersion + &quot;&lt;/version&gt;&quot;);
+<span class="nc" id="L196">                        java.nio.file.Files.writeString(</span>
+<span class="nc" id="L197">                                subPom.toPath(), updated,</span>
+                                java.nio.charset.StandardCharsets.UTF_8);
+<span class="nc" id="L199">                        String rel = dir.toPath().relativize(subPom.toPath()).toString();</span>
+<span class="nc" id="L200">                        getLog().info(&quot;    updated: &quot; + rel);</span>
+<span class="nc" id="L201">                        ReleaseSupport.exec(dir, getLog(), &quot;git&quot;, &quot;add&quot;, rel);</span>
+                    }
+<span class="nc" id="L203">                } catch (java.io.IOException e) {</span>
+<span class="nc" id="L204">                    getLog().warn(&quot;    Could not update &quot; + subPom + &quot;: &quot; + e.getMessage());</span>
+<span class="nc" id="L205">                }</span>
+<span class="nc" id="L206">            }</span>
+<span class="nc" id="L207">        } catch (MojoExecutionException e) {</span>
+<span class="nc" id="L208">            getLog().warn(&quot;    Could not scan for submodule POMs: &quot; + e.getMessage());</span>
+<span class="fc" id="L209">        }</span>
+<span class="fc" id="L210">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

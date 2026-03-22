@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>CopyDocsToSiteMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">CopyDocsToSiteMojo.java</span></div><h1>CopyDocsToSiteMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.LifecyclePhase;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.List;
+
+/**
+ * Copy rendered HTML docs and assets into the Maven site output directory.
+ *
+ * &lt;p&gt;Copies HTML files plus supporting assets (SVG diagrams, PNG/JPG
+ * images, CSS stylesheets) from the Asciidoctor generated-docs directory
+ * into {@code target/site/docs/} so they are deployed alongside the
+ * Maven site.
+ *
+ * &lt;p&gt;Replaces: {@code copy-docs-to-site.sh}
+ *
+ * &lt;p&gt;Usage:
+ * &lt;pre&gt;
+ * mvn ike:copy-docs -DgeneratedDocsDir=target/generated-docs/html -DsiteDir=target/site
+ * &lt;/pre&gt;
+ */
+@Mojo(name = &quot;copy-docs&quot;,
+      defaultPhase = LifecyclePhase.SITE,
+      threadSafe = true)
+<span class="fc" id="L35">public class CopyDocsToSiteMojo extends AbstractMojo {</span>
+
+    /** Directory containing rendered HTML and assets. */
+    @Parameter(property = &quot;generatedDocsDir&quot;, required = true)
+    File generatedDocsDir;
+
+    /** Maven site output directory (e.g., {@code target/site}). */
+    @Parameter(property = &quot;siteDir&quot;, required = true)
+    File siteDir;
+
+    /** File extensions to copy from generated-docs to the site. */
+<span class="fc" id="L46">    public static final List&lt;String&gt; COPY_EXTENSIONS =</span>
+<span class="fc" id="L47">            List.of(&quot;.html&quot;, &quot;.svg&quot;, &quot;.png&quot;, &quot;.jpg&quot;, &quot;.css&quot;);</span>
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="fc bfc" id="L51" title="All 2 branches covered.">        if (!generatedDocsDir.isDirectory()) {</span>
+<span class="fc" id="L52">            getLog().info(&quot;copy-docs: generated-docs directory does not exist, &quot;</span>
+                    + &quot;skipping — &quot; + generatedDocsDir);
+<span class="fc" id="L54">            return;</span>
+        }
+
+<span class="fc" id="L57">        Path source = generatedDocsDir.toPath();</span>
+<span class="fc" id="L58">        Path dest = siteDir.toPath().resolve(&quot;docs&quot;);</span>
+
+<span class="fc" id="L60">        int copied = 0;</span>
+        try {
+<span class="fc" id="L62">            Files.createDirectories(dest);</span>
+
+<span class="fc bfc" id="L64" title="All 2 branches covered.">            for (String ext : COPY_EXTENSIONS) {</span>
+<span class="fc" id="L65">                copied += copyByExtension(source, dest, ext);</span>
+<span class="fc" id="L66">            }</span>
+<span class="nc" id="L67">        } catch (IOException e) {</span>
+<span class="nc" id="L68">            throw new MojoExecutionException(</span>
+                    &quot;Failed to copy docs to site&quot;, e);
+<span class="fc" id="L70">        }</span>
+
+<span class="pc bpc" id="L72" title="1 of 2 branches missed.">        if (copied &gt; 0) {</span>
+<span class="fc" id="L73">            getLog().info(&quot;copy-docs: copied &quot; + copied</span>
+                    + &quot; file(s) to &quot; + dest);
+        } else {
+<span class="nc" id="L76">            getLog().info(&quot;copy-docs: no matching files in &quot;</span>
+                    + generatedDocsDir);
+        }
+<span class="fc" id="L79">    }</span>
+
+    /**
+     * Copy all files with the given extension from source to dest.
+     *
+     * @return number of files copied
+     */
+    private int copyByExtension(Path source, Path dest, String extension)
+            throws IOException {
+<span class="fc" id="L88">        int count = 0;</span>
+<span class="fc" id="L89">        try (DirectoryStream&lt;Path&gt; stream =</span>
+<span class="fc" id="L90">                     Files.newDirectoryStream(source, &quot;*&quot; + extension)) {</span>
+<span class="fc bfc" id="L91" title="All 2 branches covered.">            for (Path file : stream) {</span>
+<span class="pc bpc" id="L92" title="1 of 2 branches missed.">                if (Files.isRegularFile(file)) {</span>
+<span class="fc" id="L93">                    Files.copy(file, dest.resolve(file.getFileName()),</span>
+                            StandardCopyOption.REPLACE_EXISTING);
+<span class="fc" id="L95">                    count++;</span>
+                }
+<span class="fc" id="L97">            }</span>
+        }
+<span class="fc" id="L99">        return count;</span>
+    }
+
+    // ── Pure testable functions ──────────────────────────────────────
+
+    /**
+     * Check whether a filename has an extension in the copy list.
+     *
+     * @param filename the filename to check
+     * @return true if the file should be copied
+     */
+    public static boolean shouldCopy(String filename) {
+<span class="fc" id="L111">        String lower = filename.toLowerCase();</span>
+<span class="fc" id="L112">        return COPY_EXTENSIONS.stream().anyMatch(lower::endsWith);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

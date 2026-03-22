@@ -1,0 +1,388 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ReleaseMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">ReleaseMojo.java</span></div><h1>ReleaseMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+import java.time.Instant;
+import java.util.List;
+
+/**
+ * Full release: build, deploy, tag, merge, and bump to next SNAPSHOT.
+ *
+ * &lt;p&gt;This goal automates the complete release workflow in one command.
+ * All local git work completes before any external action, so a
+ * deploy failure leaves the local repository in a consistent state
+ * and the deploy can be retried manually.
+ *
+ * &lt;p&gt;&lt;strong&gt;Local phase (idempotent):&lt;/strong&gt;&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;Validate prerequisites (branch, clean worktree)&lt;/li&gt;
+ *   &lt;li&gt;Create {@code release/&lt;version&gt;} branch&lt;/li&gt;
+ *   &lt;li&gt;Set POM version to release version&lt;/li&gt;
+ *   &lt;li&gt;Build and verify&lt;/li&gt;
+ *   &lt;li&gt;Build site (pre-flight — catches javadoc errors early)&lt;/li&gt;
+ *   &lt;li&gt;Commit, tag&lt;/li&gt;
+ *   &lt;li&gt;Restore {@code ${project.version}}, merge to main&lt;/li&gt;
+ *   &lt;li&gt;Bump to next SNAPSHOT version, verify, commit&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;&lt;strong&gt;External phase (most reversible first, irreversible last):&lt;/strong&gt;&lt;/p&gt;
+ * &lt;ol&gt;
+ *   &lt;li&gt;Deploy site from tagged commit (overwritable — safe to retry)&lt;/li&gt;
+ *   &lt;li&gt;Deploy to Nexus from tagged commit (irreversible — last)&lt;/li&gt;
+ *   &lt;li&gt;Push tag and main to origin&lt;/li&gt;
+ *   &lt;li&gt;Create GitHub Release&lt;/li&gt;
+ * &lt;/ol&gt;
+ *
+ * &lt;p&gt;Usage: {@code mvn ike:release} (auto-derives version from POM),
+ * or override with {@code mvn ike:release -DreleaseVersion=2}
+ *
+ * @see CheckpointMojo
+ */
+@Mojo(name = &quot;release&quot;, requiresProject = false, aggregator = true, threadSafe = true)
+<span class="fc" id="L46">public class ReleaseMojo extends AbstractMojo {</span>
+
+    @Parameter(property = &quot;releaseVersion&quot;)
+    String releaseVersion;
+
+    @Parameter(property = &quot;nextVersion&quot;)
+    String nextVersion;
+
+    @Parameter(property = &quot;dryRun&quot;, defaultValue = &quot;false&quot;)
+    boolean dryRun;
+
+    @Parameter(property = &quot;skipVerify&quot;, defaultValue = &quot;false&quot;)
+    boolean skipVerify;
+
+    @Parameter(property = &quot;allowBranch&quot;)
+    String allowBranch;
+
+    @Parameter(property = &quot;deploySite&quot;, defaultValue = &quot;true&quot;)
+    boolean deploySite;
+
+    /** Override working directory for tests. If null, uses current directory. */
+    File baseDir;
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="pc bpc" id="L71" title="1 of 2 branches missed.">        File startDir = baseDir != null ? baseDir : new File(&quot;.&quot;);</span>
+<span class="fc" id="L72">        File gitRoot = ReleaseSupport.gitRoot(startDir);</span>
+<span class="fc" id="L73">        File mvnw = ReleaseSupport.resolveMavenWrapper(gitRoot, getLog());</span>
+<span class="fc" id="L74">        File rootPom = new File(gitRoot, &quot;pom.xml&quot;);</span>
+
+        // Default releaseVersion from current POM version
+<span class="fc" id="L77">        String oldVersion = ReleaseSupport.readPomVersion(rootPom);</span>
+<span class="pc bpc" id="L78" title="3 of 4 branches missed.">        if (releaseVersion == null || releaseVersion.isBlank()) {</span>
+<span class="fc" id="L79">            releaseVersion = ReleaseSupport.deriveReleaseVersion(oldVersion);</span>
+<span class="fc" id="L80">            getLog().info(&quot;No -DreleaseVersion specified; defaulting to: &quot; + releaseVersion);</span>
+        }
+
+        // Default nextVersion
+<span class="pc bpc" id="L84" title="3 of 4 branches missed.">        if (nextVersion == null || nextVersion.isBlank()) {</span>
+<span class="fc" id="L85">            nextVersion = ReleaseSupport.deriveNextSnapshot(releaseVersion);</span>
+        }
+
+        // Reject SNAPSHOT release versions
+<span class="pc bpc" id="L89" title="1 of 2 branches missed.">        if (releaseVersion.contains(&quot;-SNAPSHOT&quot;)) {</span>
+<span class="nc" id="L90">            throw new MojoExecutionException(</span>
+                    &quot;Release version must not contain -SNAPSHOT.&quot;);
+        }
+
+        // Enforce SNAPSHOT suffix on next version
+<span class="pc bpc" id="L95" title="1 of 2 branches missed.">        if (!nextVersion.endsWith(&quot;-SNAPSHOT&quot;)) {</span>
+<span class="nc" id="L96">            throw new MojoExecutionException(</span>
+                    &quot;Next version must end with -SNAPSHOT (got '&quot; + nextVersion + &quot;').&quot;);
+        }
+
+        // Validate branch
+<span class="fc" id="L101">        String currentBranch = ReleaseSupport.currentBranch(gitRoot);</span>
+<span class="fc bfc" id="L102" title="All 2 branches covered.">        String expectedBranch = allowBranch != null ? allowBranch : &quot;main&quot;;</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">        if (!currentBranch.equals(expectedBranch)) {</span>
+<span class="fc" id="L104">            throw new MojoExecutionException(</span>
+                    &quot;Must be on '&quot; + expectedBranch + &quot;' branch (currently on '&quot; +
+                            currentBranch + &quot;'). Use -DallowBranch=&quot; +
+                            currentBranch + &quot; to override.&quot;);
+        }
+
+        // Check release branch doesn't already exist
+<span class="fc" id="L111">        String releaseBranch = &quot;release/&quot; + releaseVersion;</span>
+        try {
+<span class="nc" id="L113">            ReleaseSupport.execCapture(gitRoot,</span>
+                    &quot;git&quot;, &quot;rev-parse&quot;, &quot;--verify&quot;, releaseBranch);
+<span class="nc" id="L115">            throw new MojoExecutionException(</span>
+                    &quot;Branch '&quot; + releaseBranch + &quot;' already exists locally.&quot;);
+<span class="fc" id="L117">        } catch (MojoExecutionException e) {</span>
+<span class="pc bpc" id="L118" title="1 of 2 branches missed.">            if (e.getMessage().startsWith(&quot;Branch '&quot;)) throw e;</span>
+            // Expected — branch does not exist
+        }
+
+<span class="fc" id="L122">        String projectId = ReleaseSupport.readPomArtifactId(rootPom);</span>
+
+        // Build environment audit
+<span class="fc" id="L125">        logAudit(gitRoot, mvnw, currentBranch, releaseBranch, oldVersion, projectId);</span>
+
+        // Validate clean worktree
+<span class="fc" id="L128">        ReleaseSupport.requireCleanWorktree(gitRoot);</span>
+
+<span class="fc bfc" id="L130" title="All 2 branches covered.">        if (dryRun) {</span>
+<span class="fc" id="L131">            getLog().info(&quot;[DRY RUN] Would create branch: &quot; + releaseBranch);</span>
+<span class="fc" id="L132">            getLog().info(&quot;[DRY RUN] Would set version: &quot; + oldVersion +</span>
+                    &quot; -&gt; &quot; + releaseVersion);
+<span class="fc" id="L134">            getLog().info(&quot;[DRY RUN] Would resolve ${project.version} -&gt; &quot; +</span>
+                    releaseVersion + &quot; in all POMs&quot;);
+<span class="fc" id="L136">            getLog().info(&quot;[DRY RUN] Would run: mvnw clean verify -B&quot;);</span>
+<span class="fc" id="L137">            getLog().info(&quot;[DRY RUN] Would commit, tag v&quot; + releaseVersion);</span>
+<span class="fc" id="L138">            getLog().info(&quot;[DRY RUN] Would restore ${project.version} references&quot;);</span>
+<span class="fc" id="L139">            getLog().info(&quot;[DRY RUN] Would merge &quot; + releaseBranch + &quot; to main&quot;);</span>
+<span class="fc" id="L140">            getLog().info(&quot;[DRY RUN] Would bump to next version: &quot; + nextVersion);</span>
+<span class="fc" id="L141">            getLog().info(&quot;[DRY RUN] --- all local work above, external below ---&quot;);</span>
+<span class="pc bpc" id="L142" title="1 of 2 branches missed.">            if (deploySite) {</span>
+<span class="nc" id="L143">                getLog().info(&quot;[DRY RUN] Would deploy site to: &quot; +</span>
+                        &quot;scpexe://proxy/srv/ike-site/&quot; + projectId + &quot;/release&quot;);
+            }
+<span class="fc" id="L146">            getLog().info(&quot;[DRY RUN] Would deploy to Nexus from tag v&quot; +</span>
+                    releaseVersion + &quot; (last — irreversible)&quot;);
+<span class="fc" id="L148">            getLog().info(&quot;[DRY RUN] Would push tag and main to origin&quot;);</span>
+<span class="fc" id="L149">            getLog().info(&quot;[DRY RUN] Would create GitHub Release&quot;);</span>
+<span class="fc" id="L150">            return;</span>
+        }
+
+        // ── Release ───────────────────────────────────────────────────
+
+        // Create release branch
+<span class="fc" id="L156">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;checkout&quot;, &quot;-b&quot;, releaseBranch);
+
+        // Set version
+<span class="fc" id="L160">        getLog().info(&quot;Setting version: &quot; + oldVersion + &quot; -&gt; &quot; + releaseVersion);</span>
+<span class="fc" id="L161">        ReleaseSupport.setPomVersion(rootPom, oldVersion, releaseVersion);</span>
+
+        // WORKAROUND: Maven 4 consumer POM doesn't resolve ${project.version}
+        // in &lt;build&gt;&lt;plugins&gt;, &lt;pluginManagement&gt;, or &lt;dependencyManagement&gt;.
+<span class="fc" id="L165">        getLog().info(&quot;Resolving ${project.version} references:&quot;);</span>
+<span class="fc" id="L166">        List&lt;File&gt; resolvedPoms =</span>
+<span class="fc" id="L167">                ReleaseSupport.replaceProjectVersionRefs(gitRoot, releaseVersion, getLog());</span>
+
+        // Build and install (not just verify) — reactor siblings with
+        // BOM imports need installed artifacts to resolve classified
+        // dependencies (e.g., ike-build-standards:zip:claude). The
+        // release version has never been installed, so 'verify' alone
+        // fails on inter-module resolution. Using 'install' puts
+        // artifacts in the local repo for sibling resolution.
+<span class="pc bpc" id="L175" title="1 of 2 branches missed.">        if (!skipVerify) {</span>
+<span class="nc" id="L176">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="nc" id="L177">                    mvnw.getAbsolutePath(), &quot;clean&quot;, &quot;install&quot;, &quot;-B&quot;);</span>
+        } else {
+<span class="fc" id="L179">            getLog().info(&quot;Skipping verify (-DskipVerify=true)&quot;);</span>
+        }
+
+        // Build site (catches javadoc errors before any commits/tags).
+        // -T 1 overrides .mvn/maven.config parallelism: maven-site-plugin
+        // is not @ThreadSafe and emits a warning in parallel sessions.
+<span class="pc bpc" id="L185" title="1 of 2 branches missed.">        if (deploySite) {</span>
+<span class="nc" id="L186">            getLog().info(&quot;Building site (pre-flight check)...&quot;);</span>
+<span class="nc" id="L187">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="nc" id="L188">                    mvnw.getAbsolutePath(), &quot;site&quot;, &quot;site:stage&quot;, &quot;-B&quot;, &quot;-T&quot;, &quot;1&quot;);</span>
+        }
+
+        // Commit
+<span class="fc" id="L192">        ReleaseSupport.exec(gitRoot, getLog(), &quot;git&quot;, &quot;add&quot;, &quot;pom.xml&quot;);</span>
+<span class="fc" id="L193">        ReleaseSupport.gitAddFiles(gitRoot, getLog(), resolvedPoms);</span>
+<span class="fc" id="L194">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;commit&quot;, &quot;-m&quot;,
+                &quot;release: set version to &quot; + releaseVersion);
+
+        // Tag
+<span class="fc" id="L199">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;tag&quot;, &quot;-a&quot;, &quot;v&quot; + releaseVersion,
+                &quot;-m&quot;, &quot;Release &quot; + releaseVersion);
+
+        // Restore ${project.version} references
+<span class="fc" id="L204">        getLog().info(&quot;Restoring ${project.version} references:&quot;);</span>
+<span class="fc" id="L205">        List&lt;File&gt; restoredPoms = ReleaseSupport.restoreBackups(gitRoot, getLog());</span>
+<span class="pc bpc" id="L206" title="1 of 2 branches missed.">        if (!restoredPoms.isEmpty()) {</span>
+<span class="nc" id="L207">            ReleaseSupport.gitAddFiles(gitRoot, getLog(), restoredPoms);</span>
+<span class="nc" id="L208">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+                    &quot;git&quot;, &quot;commit&quot;, &quot;-m&quot;,
+                    &quot;release: restore ${project.version} references&quot;);
+        }
+
+        // Merge back to main
+<span class="fc" id="L214">        ReleaseSupport.exec(gitRoot, getLog(), &quot;git&quot;, &quot;checkout&quot;, &quot;main&quot;);</span>
+<span class="fc" id="L215">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;merge&quot;, &quot;--no-ff&quot;, releaseBranch,
+                &quot;-m&quot;, &quot;merge: release &quot; + releaseVersion);
+
+        // ── Post-release bump ─────────────────────────────────────────
+
+<span class="fc" id="L221">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L222">        getLog().info(&quot;Bumping to next version: &quot; + nextVersion);</span>
+
+        // Re-read version after merge (it's the release version on main now)
+<span class="fc" id="L225">        String currentVersion = ReleaseSupport.readPomVersion(rootPom);</span>
+<span class="fc" id="L226">        ReleaseSupport.setPomVersion(rootPom, currentVersion, nextVersion);</span>
+
+        // Verify build with new SNAPSHOT version
+<span class="fc" id="L229">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="fc" id="L230">                mvnw.getAbsolutePath(), &quot;clean&quot;, &quot;verify&quot;, &quot;-B&quot;);</span>
+
+        // Commit
+<span class="fc" id="L233">        ReleaseSupport.exec(gitRoot, getLog(), &quot;git&quot;, &quot;add&quot;, &quot;pom.xml&quot;);</span>
+<span class="fc" id="L234">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;commit&quot;, &quot;-m&quot;,
+                &quot;post-release: bump to &quot; + nextVersion);
+
+        // Clean up release branch
+<span class="fc" id="L239">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;branch&quot;, &quot;-d&quot;, releaseBranch);
+
+        // ── External actions (all local work is done) ─────────────────
+        // Everything above this point is local and idempotent. If any
+        // external action below fails, all local git state is consistent
+        // and the deploy can be retried manually.
+        //
+        // Order matters — most reversible actions first, irreversible last:
+        //   1. Site deploy (overwritable — safe to retry)
+        //   2. Nexus deploy (irreversible — release repos reject overwrites)
+        //   3. Push tag + main (additive — safe to retry)
+        //   4. GitHub Release (additive — safe to retry)
+
+<span class="fc" id="L253">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L254">        getLog().info(&quot;Local work complete. Starting external deploys...&quot;);</span>
+<span class="fc" id="L255">        getLog().info(&quot;&quot;);</span>
+
+<span class="fc" id="L257">        boolean hasOrigin = ReleaseSupport.hasRemote(gitRoot, &quot;origin&quot;);</span>
+
+        // Deploy from the tagged release commit
+<span class="fc" id="L260">        ReleaseSupport.exec(gitRoot, getLog(),</span>
+                &quot;git&quot;, &quot;checkout&quot;, &quot;v&quot; + releaseVersion);
+        try {
+            // Site deploy first (overwritable — can always re-deploy).
+            // Must rebuild site here because the tag checkout wiped target/.
+            // The local-phase site:stage was a pre-flight check only.
+            //
+            // Stage-and-swap: deploy to .staging dir, then atomic rename.
+            // This avoids a window where the live site is missing and
+            // eliminates stale files from previous releases.
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">            if (deploySite) {</span>
+<span class="nc" id="L271">                String releaseDisk = ReleaseSupport.siteDiskPath(</span>
+                        projectId, &quot;release&quot;, null);
+<span class="nc" id="L273">                String stagingDisk = ReleaseSupport.siteStagingPath(releaseDisk);</span>
+<span class="nc" id="L274">                String releaseUrl = &quot;scpexe://proxy&quot; + releaseDisk;</span>
+<span class="nc" id="L275">                String stagingUrl = ReleaseSupport.siteStagingUrl(releaseUrl);</span>
+
+<span class="nc" id="L277">                getLog().info(&quot;Deploying site to staging...&quot;);</span>
+<span class="nc" id="L278">                ReleaseSupport.cleanRemoteSiteDir(gitRoot, getLog(), stagingDisk);</span>
+                // Run verify before site so JaCoCo coverage data is generated.
+                // The tag checkout wiped target/, so jacoco.exec must be
+                // recreated for the coverage report to appear in the site.
+                // -T 1: maven-site-plugin is not @ThreadSafe; sequential
+                // execution avoids spurious warnings in parallel sessions.
+<span class="nc" id="L284">                ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="nc" id="L285">                        mvnw.getAbsolutePath(), &quot;verify&quot;, &quot;site&quot;, &quot;site:stage&quot;,</span>
+                        &quot;site:deploy&quot;, &quot;-B&quot;, &quot;-T&quot;, &quot;1&quot;,
+                        &quot;-Dsite.deploy.url=&quot; + stagingUrl);
+<span class="nc" id="L288">                ReleaseSupport.swapRemoteSiteDir(gitRoot, getLog(), releaseDisk);</span>
+            }
+
+            // Nexus deploy LAST — irreversible, only after everything
+            // else has succeeded. Install first so reactor siblings
+            // with BOM imports can resolve classified artifacts.
+<span class="fc" id="L294">            getLog().info(&quot;Deploying to Nexus...&quot;);</span>
+<span class="pc" id="L295">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+<span class="fc" id="L296">                    mvnw.getAbsolutePath(), &quot;clean&quot;, &quot;deploy&quot;, &quot;-B&quot;,</span>
+                    &quot;-P&quot;, &quot;release,signArtifacts&quot;);
+        } finally {
+            // Always return to main, even if deploy fails
+<span class="fc" id="L300">            ReleaseSupport.exec(gitRoot, getLog(), &quot;git&quot;, &quot;checkout&quot;, &quot;main&quot;);</span>
+        }
+
+        // Push tag and main
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (hasOrigin) {</span>
+<span class="nc" id="L305">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+                    &quot;git&quot;, &quot;push&quot;, &quot;origin&quot;, &quot;v&quot; + releaseVersion);
+<span class="nc" id="L307">            ReleaseSupport.exec(gitRoot, getLog(),</span>
+                    &quot;git&quot;, &quot;push&quot;, &quot;origin&quot;, &quot;main&quot;);
+        } else {
+<span class="nc" id="L310">            getLog().info(&quot;No 'origin' remote — skipping push&quot;);</span>
+        }
+
+        // Create GitHub Release
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (hasOrigin) {</span>
+            try {
+<span class="nc" id="L316">                ReleaseSupport.exec(gitRoot, getLog(),</span>
+                        &quot;gh&quot;, &quot;release&quot;, &quot;create&quot;, &quot;v&quot; + releaseVersion,
+                        &quot;--title&quot;, releaseVersion,
+                        &quot;--generate-notes&quot;, &quot;--verify-tag&quot;);
+<span class="nc" id="L320">            } catch (MojoExecutionException e) {</span>
+<span class="nc" id="L321">                getLog().warn(&quot;GitHub Release creation failed (gh CLI may not be installed): &quot; +</span>
+<span class="nc" id="L322">                        e.getMessage());</span>
+<span class="nc" id="L323">                getLog().warn(&quot;Run manually: gh release create v&quot; + releaseVersion +</span>
+                        &quot; --title &quot; + releaseVersion + &quot; --generate-notes&quot;);
+<span class="nc" id="L325">            }</span>
+        } else {
+<span class="nc" id="L327">            getLog().info(&quot;No 'origin' remote — skipping GitHub Release&quot;);</span>
+        }
+
+        // Clean up the main-branch snapshot site — the release site
+        // replaces it. Non-fatal if it fails (may not exist).
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (deploySite) {</span>
+<span class="nc" id="L333">            String snapshotDisk = ReleaseSupport.siteDiskPath(</span>
+                    projectId, &quot;snapshot&quot;, &quot;main&quot;);
+            try {
+<span class="nc" id="L336">                getLog().info(&quot;Cleaning snapshot/main site...&quot;);</span>
+<span class="nc" id="L337">                ReleaseSupport.cleanRemoteSiteDir(gitRoot, getLog(), snapshotDisk);</span>
+<span class="nc" id="L338">            } catch (MojoExecutionException e) {</span>
+<span class="nc" id="L339">                getLog().warn(&quot;Could not clean snapshot site (may not exist): &quot;</span>
+<span class="nc" id="L340">                        + e.getMessage());</span>
+<span class="nc" id="L341">            }</span>
+        }
+
+<span class="nc" id="L344">        getLog().info(&quot;&quot;);</span>
+<span class="nc" id="L345">        getLog().info(&quot;Release &quot; + releaseVersion + &quot; complete.&quot;);</span>
+<span class="nc" id="L346">        getLog().info(&quot;  Tagged: v&quot; + releaseVersion);</span>
+<span class="nc" id="L347">        getLog().info(&quot;  Deployed to Nexus&quot;);</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">        if (deploySite) {</span>
+<span class="nc" id="L349">            getLog().info(&quot;  Site: http://ike.komet.sh/&quot; + projectId + &quot;/release/&quot;);</span>
+        }
+<span class="nc" id="L351">        getLog().info(&quot;  Merged to main&quot;);</span>
+<span class="nc" id="L352">        getLog().info(&quot;  Next version: &quot; + nextVersion);</span>
+<span class="nc" id="L353">    }</span>
+
+    private void logAudit(File gitRoot, File mvnw, String branch,
+                          String releaseBranch, String oldVersion,
+                          String projectId) throws MojoExecutionException {
+<span class="fc" id="L358">        String gitCommit = ReleaseSupport.execCapture(gitRoot,</span>
+                &quot;git&quot;, &quot;rev-parse&quot;, &quot;--short&quot;, &quot;HEAD&quot;);
+<span class="fc" id="L360">        String mavenVersion = ReleaseSupport.execCapture(gitRoot,</span>
+<span class="fc" id="L361">                mvnw.getAbsolutePath(), &quot;--version&quot;);</span>
+<span class="fc" id="L362">        String javaVersion = System.getProperty(&quot;java.version&quot;, &quot;unknown&quot;);</span>
+
+<span class="fc" id="L364">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L365">        getLog().info(&quot;RELEASE PARAMETERS&quot;);</span>
+<span class="fc" id="L366">        getLog().info(&quot;  Version:        &quot; + oldVersion + &quot; -&gt; &quot; + releaseVersion);</span>
+<span class="fc" id="L367">        getLog().info(&quot;  Next version:   &quot; + nextVersion);</span>
+<span class="fc" id="L368">        getLog().info(&quot;  Source branch:  &quot; + branch);</span>
+<span class="fc" id="L369">        getLog().info(&quot;  Release branch: &quot; + releaseBranch);</span>
+<span class="fc" id="L370">        getLog().info(&quot;  Tag:            v&quot; + releaseVersion);</span>
+<span class="fc" id="L371">        getLog().info(&quot;  Project:        &quot; + projectId);</span>
+<span class="fc" id="L372">        getLog().info(&quot;  Deploy site:    &quot; + deploySite);</span>
+<span class="fc" id="L373">        getLog().info(&quot;  Skip verify:    &quot; + skipVerify);</span>
+<span class="fc" id="L374">        getLog().info(&quot;  Dry run:        &quot; + dryRun);</span>
+<span class="fc" id="L375">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L376">        getLog().info(&quot;BUILD ENVIRONMENT&quot;);</span>
+<span class="fc" id="L377">        getLog().info(&quot;  Date:           &quot; + Instant.now());</span>
+<span class="fc" id="L378">        getLog().info(&quot;  User:           &quot; + System.getProperty(&quot;user.name&quot;, &quot;unknown&quot;));</span>
+<span class="fc" id="L379">        getLog().info(&quot;  Git commit:     &quot; + gitCommit);</span>
+<span class="fc" id="L380">        getLog().info(&quot;  Git root:       &quot; + gitRoot.getAbsolutePath());</span>
+<span class="fc" id="L381">        getLog().info(&quot;  Maven:          &quot; + mavenVersion.lines().findFirst().orElse(&quot;unknown&quot;));</span>
+<span class="fc" id="L382">        getLog().info(&quot;  Java version:   &quot; + javaVersion);</span>
+<span class="fc" id="L383">        getLog().info(&quot;  OS:             &quot; + System.getProperty(&quot;os.name&quot;) + &quot; &quot; +</span>
+<span class="fc" id="L384">                System.getProperty(&quot;os.arch&quot;));</span>
+<span class="fc" id="L385">        getLog().info(&quot;&quot;);</span>
+<span class="fc" id="L386">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>

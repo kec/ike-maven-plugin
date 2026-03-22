@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>WorkspaceMojo.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">IKE Maven Plugin</a> &gt; <a href="index.source.html" class="el_package">network.ike.plugin</a> &gt; <span class="el_source">WorkspaceMojo.java</span></div><h1>WorkspaceMojo.java</h1><pre class="source lang-java linenums">package network.ike.plugin;
+
+import org.apache.maven.plugin.AbstractMojo;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+
+/**
+ * Deprecated placeholder — use the specific workspace goals instead.
+ *
+ * @deprecated Use {@code ike:dashboard}, {@code ike:init}, {@code ike:status},
+ *             {@code ike:pull}, {@code ike:verify}, {@code ike:cascade},
+ *             {@code ike:graph}, or {@code ike:stignore}.
+ */
+@Deprecated
+@Mojo(name = &quot;workspace&quot;, requiresProject = false, threadSafe = true)
+<span class="nc" id="L16">public class WorkspaceMojo extends AbstractMojo {</span>
+
+    @Override
+    public void execute() throws MojoExecutionException {
+<span class="nc" id="L20">        getLog().warn(&quot;ike:workspace is deprecated. Use the specific workspace goals:&quot;);</span>
+<span class="nc" id="L21">        getLog().info(&quot;  ike:dashboard   — Composite overview (verify + status + cascade)&quot;);</span>
+<span class="nc" id="L22">        getLog().info(&quot;  ike:init        — Clone/initialize repos&quot;);</span>
+<span class="nc" id="L23">        getLog().info(&quot;  ike:pull        — Git pull across repos&quot;);</span>
+<span class="nc" id="L24">        getLog().info(&quot;  ike:status      — Git status across repos&quot;);</span>
+<span class="nc" id="L25">        getLog().info(&quot;  ike:verify      — Check manifest consistency&quot;);</span>
+<span class="nc" id="L26">        getLog().info(&quot;  ike:cascade     — Downstream impact analysis&quot;);</span>
+<span class="nc" id="L27">        getLog().info(&quot;  ike:graph       — Dependency graph&quot;);</span>
+<span class="nc" id="L28">        getLog().info(&quot;  ike:stignore    — Generate Syncthing .stignore files&quot;);</span>
+<span class="nc" id="L29">        getLog().info(&quot;&quot;);</span>
+<span class="nc" id="L30">        getLog().info(&quot;Run 'mvn ike:help' for full options.&quot;);</span>
+<span class="nc" id="L31">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.14.202510111229</span></div></body></html>
