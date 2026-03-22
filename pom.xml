@@ -121,7 +121,7 @@
                 <plugin>
                     <groupId>network.ike</groupId>
                     <artifactId>ike-maven-plugin</artifactId>
-                    <version>17</version>
+                    <version>${project.version}</version>
                 </plugin>
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
