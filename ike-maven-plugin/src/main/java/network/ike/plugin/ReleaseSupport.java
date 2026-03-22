@@ -89,6 +89,12 @@ class ReleaseSupport {
             log.info(prefix + line.substring(7));
         } else if (line.startsWith("[DEBUG] ")) {
             log.debug(prefix + line.substring(8));
+        } else if (line.startsWith("WARNING: ")) {
+            // JVM-style warnings (e.g., sun.misc.Unsafe deprecation)
+            log.warn(prefix + line.substring(9));
+        } else if (line.startsWith("ERROR: ")) {
+            // JVM-style errors
+            log.error(prefix + line.substring(7));
         } else {
             log.info(prefix + line);
         }
