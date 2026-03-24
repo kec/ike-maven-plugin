@@ -1,0 +1,18 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="ike:help" type="MavenRunConfiguration" factoryName="Maven">
+    <MavenSettings>
+      <option name="myGeneralSettings" />
+      <option name="myRunnerSettings" />
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="workingDirPath" value="$PROJECT_DIR$" />
+          <option name="goals">
+            <list>
+              <option value="ike:help" />
+            </list>
+          </option>
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
+  </configuration>
+</component>

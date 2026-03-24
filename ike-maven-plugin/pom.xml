@@ -70,6 +70,12 @@
         <maven-plugin-annotations.version>3.15.1</maven-plugin-annotations.version>
         <maven-plugin-plugin.version>3.15.1</maven-plugin-plugin.version>
         <asm.version>9.9.1</asm.version>
+        <!-- AsciidoctorJ toolchain for ike:asciidoc goal -->
+        <asciidoctorj.version>3.0.1</asciidoctorj.version>
+        <asciidoctorj-pdf.version>2.3.23</asciidoctorj-pdf.version>
+        <asciidoctorj-diagram.version>3.2.1</asciidoctorj-diagram.version>
+        <jruby.version>10.0.3.0</jruby.version>
+        <koncept-extension.version>29-SNAPSHOT</koncept-extension.version>
     </properties>
 
     <dependencies>
@@ -96,6 +102,39 @@
             <version>${maven-plugin-api.version}</version>
             <scope>provided</scope>
         </dependency>
+        <!-- ── AsciidoctorJ toolchain (ike:asciidoc goal) ──────────── -->
+        <dependency>
+            <groupId>org.asciidoctor</groupId>
+            <artifactId>asciidoctorj</artifactId>
+            <version>${asciidoctorj.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.jruby</groupId>
+                    <artifactId>jruby-base</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.asciidoctor</groupId>
+            <artifactId>asciidoctorj-pdf</artifactId>
+            <version>${asciidoctorj-pdf.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.asciidoctor</groupId>
+            <artifactId>asciidoctorj-diagram</artifactId>
+            <version>${asciidoctorj-diagram.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jruby</groupId>
+            <artifactId>jruby</artifactId>
+            <version>${jruby.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>network.ike</groupId>
+            <artifactId>koncept-asciidoc-extension</artifactId>
+            <version>${koncept-extension.version}</version>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
