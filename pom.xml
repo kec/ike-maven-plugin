@@ -19,7 +19,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-tooling</artifactId>
-    <version>30</version>
+    <version>31-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>IKE Tooling</name>
