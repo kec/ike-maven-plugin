@@ -28,6 +28,7 @@ class ManifestReaderTest {
     @Test
     void parsesDefaults() {
         assertThat(manifest.defaults().branch()).isEqualTo("main");
+        assertThat(manifest.defaults().mavenVersion()).isEqualTo("4.0.0-rc-5");
     }
 
     @Test
@@ -116,6 +117,18 @@ class ManifestReaderTest {
     }
 
     @Test
+    void parsesComponentMavenVersionOverride() {
+        Component komet = manifest.components().get("komet");
+        assertThat(komet.mavenVersion()).isEqualTo("4.0.0-rc-3");
+    }
+
+    @Test
+    void inheritsNullMavenVersionWhenNotSpecified() {
+        Component tinkar = manifest.components().get("tinkar-core");
+        assertThat(tinkar.mavenVersion()).isNull();
+    }
+
+    @Test
     void rejectsEmptyManifest() {
         assertThatThrownBy(() -> ManifestReader.read(new StringReader("")))
                 .isInstanceOf(ManifestException.class)
@@ -134,5 +147,7 @@ class ManifestReaderTest {
         Manifest m = ManifestReader.read(new StringReader(yaml));
         assertThat(m.components()).hasSize(1);
         assertThat(m.components().get("my-lib").branch()).isEqualTo("main");
+        assertThat(m.defaults().mavenVersion()).isNull();
+        assertThat(m.components().get("my-lib").mavenVersion()).isNull();
     }
 }

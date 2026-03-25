@@ -3,10 +3,9 @@
   IKE Community — Maven Plugin
   ═════════════════════════════
 
-  Lightweight Maven plugin providing IDE-discoverable goals that
-  wrap the bash scripts in ike-build-tools. Each Maven goal maps
-  to one bash script — the plugin is a discoverability shim, not
-  an engine.
+  Cross-platform Maven plugin providing release, workspace, feature
+  branching, documentation, and build management goals for IKE
+  projects. All logic is implemented in Java — no bash scripts.
 
   Build:    mvn install
   Test:     mvn ike:help -pl ike-maven-plugin
@@ -28,8 +27,8 @@
 
     <name>IKE Maven Plugin</name>
     <description>
-        IDE-discoverable Maven goals wrapping ike-build-tools bash scripts.
-        The plugin provides discoverability; the scripts hold the logic.
+        Cross-platform Maven plugin providing release, workspace, feature
+        branching, documentation, and build management goals for IKE projects.
     </description>
     <url>https://github.com/kec/ike-tooling</url>
     <inceptionYear>2026</inceptionYear>
@@ -74,7 +73,7 @@
         <asciidoctorj.version>3.0.1</asciidoctorj.version>
         <asciidoctorj-pdf.version>2.3.23</asciidoctorj-pdf.version>
         <asciidoctorj-diagram.version>3.2.1</asciidoctorj-diagram.version>
-        <koncept-extension.version>29-SNAPSHOT</koncept-extension.version>
+        <koncept-extension.version>31</koncept-extension.version>
     </properties>
 
     <dependencies>
