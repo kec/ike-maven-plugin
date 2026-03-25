@@ -29,6 +29,7 @@ defaults:
   # No single default org — repos span three orgs.
   # Each component specifies its own repo URL.
   branch: main
+  maven-version: "4.0.0-rc-5"
 
 # ─── Component types ──────────────────────────────────────────────
 
@@ -180,6 +181,7 @@ components:
         relationship: build
       - component: ike-bom
         relationship: build
+    maven-version: "4.0.0-rc-3"
     notes: >
       MIGRATION: Repo is in ikmdev org (target: IKE-Community).
       POM is STILL Maven 4.0.0 namespace (target: 4.1.0).

@@ -70,9 +70,12 @@ public final class ManifestReader {
 
     private static Defaults parseDefaults(Map<String, Object> map) {
         if (map == null) {
-            return new Defaults("main");
+            return new Defaults("main", null);
         }
-        return new Defaults(stringField(map, "branch", "main"));
+        return new Defaults(
+                stringField(map, "branch", "main"),
+                stringField(map, "maven-version", null)
+        );
     }
 
     private static Map<String, ComponentType> parseComponentTypes(
@@ -134,7 +137,8 @@ public final class ManifestReader {
                 version,
                 stringField(fields, "groupId", ""),
                 deps,
-                stringField(fields, "notes", null)
+                stringField(fields, "notes", null),
+                stringField(fields, "maven-version", null)
         );
     }
 

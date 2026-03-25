@@ -1,14 +1,20 @@
 package network.ike.plugin;
 
 import network.ike.workspace.Component;
+import network.ike.workspace.Defaults;
 import network.ike.workspace.WorkspaceGraph;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -48,6 +54,7 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
     public void execute() throws MojoExecutionException {
         WorkspaceGraph graph = loadGraph();
         File root = workspaceRoot();
+        Defaults defaults = graph.manifest().defaults();
 
         Set<String> targets;
         if (group != null && !group.isEmpty()) {
@@ -65,11 +72,15 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
         getLog().info("  Target: " + (group != null ? group : "all")
                 + " (" + sorted.size() + " components)");
         getLog().info("  Root:   " + root.getAbsolutePath());
+        if (defaults.mavenVersion() != null) {
+            getLog().info("  Maven:  " + defaults.mavenVersion() + " (default)");
+        }
         getLog().info("");
 
         int cloned = 0;
         int syncthing = 0;
         int skipped = 0;
+        int wrappers = 0;
 
         for (String name : sorted) {
             Component component = graph.manifest().components().get(name);
@@ -77,8 +88,11 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             File gitDir = new File(dir, ".git");
 
             if (gitDir.exists()) {
-                // Already a git repo
+                // Already a git repo — still ensure wrapper is current
                 getLog().info("  ✓ " + name + " — already initialized");
+                if (ensureMavenWrapper(dir, component, defaults)) {
+                    wrappers++;
+                }
                 skipped++;
                 continue;
             }
@@ -97,19 +111,27 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
                         + " — initializing git in existing directory (Syncthing)");
                 initSyncthingRepo(dir, repo, branch);
                 installHooks(dir);
+                if (ensureMavenWrapper(dir, component, defaults)) {
+                    wrappers++;
+                }
                 syncthing++;
             } else {
                 // Fresh clone
                 getLog().info("  ↓ " + name + " — cloning from " + repo);
                 cloneRepo(root, name, repo, branch);
-                installHooks(new File(root, name));
+                File componentDir = new File(root, name);
+                installHooks(componentDir);
+                if (ensureMavenWrapper(componentDir, component, defaults)) {
+                    wrappers++;
+                }
                 cloned++;
             }
         }
 
         getLog().info("");
         getLog().info("  Done: " + cloned + " cloned, " + syncthing
-                + " Syncthing-initialized, " + skipped + " already present");
+                + " Syncthing-initialized, " + skipped + " already present"
+                + (wrappers > 0 ? ", " + wrappers + " Maven wrappers installed/updated" : ""));
         getLog().info("");
     }
 
@@ -135,6 +157,177 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             throws MojoExecutionException {
         ReleaseSupport.exec(root, getLog(),
                 "git", "clone", "-b", branch, repo, name);
+    }
+
+    /**
+     * Resolve the effective Maven version for a component: component override,
+     * then workspace default, then null (no wrapper).
+     */
+    private String resolveMavenVersion(Component component, Defaults defaults) {
+        if (component.mavenVersion() != null) {
+            return component.mavenVersion();
+        }
+        return defaults.mavenVersion();
+    }
+
+    /**
+     * Ensure the Maven wrapper is installed and points to the correct version.
+     * Writes {@code .mvn/wrapper/maven-wrapper.properties} and the
+     * {@code mvnw} / {@code mvnw.cmd} launcher scripts.
+     *
+     * <p>Skips if no maven-version is configured for this component.
+     * Updates the properties file if the version has changed (e.g., after
+     * a branch switch updates workspace.yaml).
+     *
+     * @param componentDir the component root directory
+     * @param component    the component definition
+     * @param defaults     workspace defaults
+     * @return true if wrapper was installed or updated
+     */
+    private boolean ensureMavenWrapper(File componentDir, Component component,
+                                        Defaults defaults) {
+        String mavenVersion = resolveMavenVersion(component, defaults);
+        if (mavenVersion == null) {
+            return false;
+        }
+
+        // Only install wrapper if the component has a pom.xml (it's a Maven project)
+        File pomFile = new File(componentDir, "pom.xml");
+        if (!pomFile.exists()) {
+            return false;
+        }
+
+        try {
+            Path wrapperDir = componentDir.toPath().resolve(".mvn").resolve("wrapper");
+            Path propsFile = wrapperDir.resolve("maven-wrapper.properties");
+
+            // Check if already at the correct version
+            if (propsFile.toFile().exists()) {
+                Properties existing = new Properties();
+                try (var reader = Files.newBufferedReader(propsFile, StandardCharsets.UTF_8)) {
+                    existing.load(reader);
+                }
+                String currentVersion = existing.getProperty("maven.version");
+                if (mavenVersion.equals(currentVersion)) {
+                    getLog().debug("    Maven wrapper already at " + mavenVersion);
+                    return false;
+                }
+                getLog().info("    Updating Maven wrapper: " + currentVersion
+                        + " → " + mavenVersion);
+            } else {
+                getLog().info("    Installing Maven wrapper for Maven " + mavenVersion);
+            }
+
+            // Create .mvn/wrapper/ directory
+            Files.createDirectories(wrapperDir);
+
+            // Write maven-wrapper.properties
+            String props = "# Maven Wrapper properties — managed by ike:init from workspace.yaml\n"
+                    + "maven.version=" + mavenVersion + "\n"
+                    + "distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/"
+                    + "apache-maven/" + mavenVersion + "/apache-maven-" + mavenVersion
+                    + "-bin.zip\n";
+            Files.writeString(propsFile, props, StandardCharsets.UTF_8);
+
+            // Write mvnw launcher script (Unix)
+            Path mvnw = componentDir.toPath().resolve("mvnw");
+            if (!mvnw.toFile().exists()) {
+                writeMvnwScript(mvnw);
+            }
+
+            // Write mvnw.cmd launcher script (Windows)
+            Path mvnwCmd = componentDir.toPath().resolve("mvnw.cmd");
+            if (!mvnwCmd.toFile().exists()) {
+                writeMvnwCmdScript(mvnwCmd);
+            }
+
+            return true;
+        } catch (IOException e) {
+            getLog().warn("    Could not install Maven wrapper: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Write the Unix mvnw launcher script. This is the standard Maven Wrapper
+     * bootstrap script that downloads the correct Maven version on first use.
+     */
+    private void writeMvnwScript(Path mvnw) throws IOException {
+        String script = """
+                #!/bin/sh
+                # Maven Wrapper launcher — installed by ike:init
+                # Downloads and caches the Maven version specified in
+                # .mvn/wrapper/maven-wrapper.properties
+                #
+                # This is a minimal bootstrap. For the full-featured wrapper script,
+                # run: mvn wrapper:wrapper
+
+                set -e
+
+                PROPS_FILE="$(dirname "$0")/.mvn/wrapper/maven-wrapper.properties"
+                if [ ! -f "$PROPS_FILE" ]; then
+                    echo "Error: $PROPS_FILE not found" >&2
+                    exit 1
+                fi
+
+                DIST_URL=$(grep '^distributionUrl=' "$PROPS_FILE" | cut -d'=' -f2-)
+                MAVEN_VERSION=$(grep '^maven.version=' "$PROPS_FILE" | cut -d'=' -f2-)
+
+                WRAPPER_HOME="${HOME}/.m2/wrapper/dists/apache-maven-${MAVEN_VERSION}"
+                MAVEN_HOME="${WRAPPER_HOME}/apache-maven-${MAVEN_VERSION}"
+
+                if [ ! -d "$MAVEN_HOME" ]; then
+                    echo "Downloading Maven ${MAVEN_VERSION}..."
+                    mkdir -p "$WRAPPER_HOME"
+                    ZIP_FILE="${WRAPPER_HOME}/apache-maven-${MAVEN_VERSION}-bin.zip"
+                    curl -fsSL -o "$ZIP_FILE" "$DIST_URL"
+                    unzip -qo "$ZIP_FILE" -d "$WRAPPER_HOME"
+                    rm -f "$ZIP_FILE"
+                    echo "Maven ${MAVEN_VERSION} installed to ${MAVEN_HOME}"
+                fi
+
+                exec "$MAVEN_HOME/bin/mvn" "$@"
+                """;
+        Files.writeString(mvnw, script, StandardCharsets.UTF_8);
+        mvnw.toFile().setExecutable(true);
+    }
+
+    /**
+     * Write the Windows mvnw.cmd launcher script.
+     */
+    private void writeMvnwCmdScript(Path mvnwCmd) throws IOException {
+        String script = """
+                @REM Maven Wrapper launcher — installed by ike:init
+                @REM Downloads and caches the Maven version specified in
+                @REM .mvn/wrapper/maven-wrapper.properties
+                @echo off
+                setlocal
+
+                set "PROPS_FILE=%~dp0.mvn\\wrapper\\maven-wrapper.properties"
+                if not exist "%PROPS_FILE%" (
+                    echo Error: %PROPS_FILE% not found >&2
+                    exit /b 1
+                )
+
+                for /f "tokens=1,* delims==" %%a in ('findstr "^maven.version=" "%PROPS_FILE%"') do set "MAVEN_VERSION=%%b"
+                for /f "tokens=1,* delims==" %%a in ('findstr "^distributionUrl=" "%PROPS_FILE%"') do set "DIST_URL=%%b"
+
+                set "WRAPPER_HOME=%USERPROFILE%\\.m2\\wrapper\\dists\\apache-maven-%MAVEN_VERSION%"
+                set "MAVEN_HOME=%WRAPPER_HOME%\\apache-maven-%MAVEN_VERSION%"
+
+                if not exist "%MAVEN_HOME%" (
+                    echo Downloading Maven %MAVEN_VERSION%...
+                    mkdir "%WRAPPER_HOME%" 2>nul
+                    set "ZIP_FILE=%WRAPPER_HOME%\\apache-maven-%MAVEN_VERSION%-bin.zip"
+                    powershell -Command "Invoke-WebRequest -Uri '%DIST_URL%' -OutFile '%ZIP_FILE%'"
+                    powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%WRAPPER_HOME%' -Force"
+                    del "%ZIP_FILE%"
+                    echo Maven %MAVEN_VERSION% installed to %MAVEN_HOME%
+                )
+
+                "%MAVEN_HOME%\\bin\\mvn.cmd" %*
+                """;
+        Files.writeString(mvnwCmd, script, StandardCharsets.UTF_8);
     }
 
     /**

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Plexus component definitions for the ike-doc custom packaging type.
+
+  ike-doc is a Maven packaging type for AsciiDoc documentation projects.
+  The primary artifact is a zip of AsciiDoc sources (not a jar).
+  Rendered outputs (HTML, PDF) are attached as classifier artifacts
+  by the rendering pipeline in ike-parent.
+-->
+<component-set>
+  <components>
+
+    <!-- Artifact handler: ike-doc produces a .zip file -->
+    <component>
+      <role>org.apache.maven.artifact.handler.ArtifactHandler</role>
+      <role-hint>ike-doc</role-hint>
+      <implementation>org.apache.maven.artifact.handler.DefaultArtifactHandler</implementation>
+      <configuration>
+        <type>ike-doc</type>
+        <extension>zip</extension>
+        <packaging>ike-doc</packaging>
+        <language>none</language>
+        <addedToClasspath>false</addedToClasspath>
+        <includesDependencies>false</includesDependencies>
+      </configuration>
+    </component>
+
+    <!--
+      Lifecycle mapping: ike-doc packaging.
+
+      Lean lifecycle for documentation projects — no compile or test
+      phases. The rendering pipeline (asciidoctor, prince, etc.) is
+      bound via profiles in ike-parent, layered on top of this base.
+
+      Phase bindings:
+        process-resources  — standard resource copying
+        package            — zip AsciiDoc sources as primary artifact
+        install            — install to local repository
+        deploy             — deploy to remote repository
+    -->
+    <component>
+      <role>org.apache.maven.lifecycle.mapping.LifecycleMapping</role>
+      <role-hint>ike-doc</role-hint>
+      <implementation>org.apache.maven.lifecycle.mapping.DefaultLifecycleMapping</implementation>
+      <configuration>
+        <lifecycles>
+          <lifecycle>
+            <id>default</id>
+            <phases>
+              <process-resources>
+                org.apache.maven.plugins:maven-resources-plugin:resources
+              </process-resources>
+              <package>
+                network.ike:ike-maven-plugin:package-doc
+              </package>
+              <install>
+                org.apache.maven.plugins:maven-install-plugin:install
+              </install>
+              <deploy>
+                org.apache.maven.plugins:maven-deploy-plugin:deploy
+              </deploy>
+            </phases>
+          </lifecycle>
+        </lifecycles>
+      </configuration>
+    </component>
+
+  </components>
+</component-set>
