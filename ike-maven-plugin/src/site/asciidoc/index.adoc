@@ -83,6 +83,22 @@ with parameter prompts.
 | List all goals with options
 | <<release>>
 
+| `ike:asciidoc`
+| AsciidoctorJ render (HTML, PDF, DocBook) with Koncept + Kroki
+| <<site-generation>>
+
+| `ike:inject-breadcrumb`
+| Patch JaCoCo HTML with nav links and IKE theme CSS
+| <<site-generation>>
+
+| `ike:copy-docs`
+| Copy pre-rendered HTML/assets into site
+| <<site-generation>>
+
+| `ike:fix-svg`
+| Strip bare `<rect/>` from Mermaid SVG output
+| <<site-generation>>
+
 | `ike:workspace`
 | _Deprecated_ -- redirects to specific goals
 | <<deprecated>>
@@ -434,3 +450,193 @@ They will be removed in a future release.
 | `ike:release-from-feature`
 | `ike:feature-finish` followed by `ike:release`
 |===
+
+[[site-generation]]
+== Site Generation Goals
+
+Goals that render AsciiDoc content, post-process HTML output, and
+integrate rendered documentation into the Maven site.
+
+The IKE plugin manages AsciidoctorJ directly rather than delegating to
+`asciidoctor-converter-doxia-module`.
+This keeps a single JRuby instance across all rendering phases, ensures
+Koncept macros and Kroki diagrams are available without duplicate extension
+registration, and decouples the AsciidoctorJ version from the Doxia module's
+transitive dependency constraints.
+The `pre-site` phase populates `target/generated-site/` with rendered HTML
+body fragments; the site plugin's Doxia layer picks these up via
+`generatedSiteDirectory` and wraps them in the skin navigation, producing
+a unified site without a second JRuby initialization.
+
+=== `ike:asciidoc`
+
+Full AsciidoctorJ render supporting HTML5, single-file HTML, Prawn PDF, and
+DocBook 5 backends.
+Koncept inline macros and Kroki diagrams are registered automatically.
+Default phase: `generate-resources`.
+For site content, bind to `pre-site` with `sourceDirectory` pointing to
+`src/site/asciidoc`.
+
+[cols="3,4,3",options="header"]
+|===
+| Parameter | Description | Default
+
+| `sourceDirectory`
+| AsciiDoc source directory
+| `${project.basedir}/src/docs/asciidoc`
+
+| `outputDirectory`
+| Root output directory (backends write to subdirectories)
+| `${project.build.directory}/ike-doc`
+
+| `sourceDocumentName`
+| Render only this file (null = all `.adoc` files)
+| _all files_
+
+| `baseDir`
+| Base directory for relative includes
+| `${project.basedir}/src/docs/asciidoc`
+
+| `skip`
+| Skip all execution
+| `false`
+
+| `skipHtml`
+| Skip HTML5 backend
+| `false`
+
+| `skipHtmlSingle`
+| Skip single-file HTML generation
+| `true`
+
+| `skipPrawn`
+| Skip Prawn PDF backend
+| `true`
+
+| `skipDocbook`
+| Skip DocBook 5 backend
+| `true`
+
+| `validate`
+| Validate output for unresolved attributes, broken xrefs
+| `true`
+
+| `strict`
+| Fail the build on any validation error
+| `false`
+
+| `diagramServerUrl`
+| Kroki diagram server URL
+| `https://kroki.komet.sh`
+
+| `documentName`
+| Output document base name
+| `${project.artifactId}`
+
+| `standalone`
+| Generate standalone HTML (with head/body shell). Set to `false` for
+  embedded body fragments suitable for Doxia integration via
+  `generatedSiteDirectory`.
+| `true`
+
+| `attributes`
+| Additional AsciiDoc attributes merged with defaults
+| _none_
+|===
+
+[source,shell]
+----
+# Build pipeline (generate-resources phase, default)
+mvn ike:asciidoc
+
+# Site content (pre-site phase, explicit binding)
+mvn ike:asciidoc -Dike.asciidoc.sourceDirectory=src/site/asciidoc \
+                 -Dike.asciidoc.outputDirectory=target/generated-site
+----
+
+=== `ike:inject-breadcrumb`
+
+Patches JaCoCo HTML reports with a breadcrumb navigation link and injects
+`ike-theme.css` into `jacoco-resources/` at both root and package levels so
+source-file pages resolve it correctly.
+Default phase: `verify`.
+
+JaCoCo generates self-contained HTML with no navigation back to the project
+site.
+This goal post-processes the reports to add a configurable breadcrumb link
+and applies IKE theme styling.
+
+[cols="3,4,3",options="header"]
+|===
+| Parameter | Description | Default
+
+| `targetDir`
+| Directory containing JaCoCo HTML reports
+| `${project.build.directory}/site/jacoco`
+
+| `link`
+| Relative URL for the breadcrumb link
+| `../index.html`
+
+| `label`
+| Display label for the breadcrumb link
+| `+← Project Site+`
+|===
+
+[source,shell]
+----
+mvn ike:inject-breadcrumb
+mvn ike:inject-breadcrumb -DbreadcrumbLink=../../index.html -Dbreadcrumb.label="← Home"
+----
+
+=== `ike:copy-docs`
+
+Copies pre-rendered HTML and assets (`.html`, `.svg`, `.png`, `.jpg`, `.css`)
+into `target/site/docs/` as static content.
+Default phase: `site`.
+
+These files are served as-is by the site plugin — they are not processed
+through Doxia.
+
+[cols="3,4,3",options="header"]
+|===
+| Parameter | Description | Default
+
+| `generatedDocsDir`
+| Directory containing rendered HTML and assets (**required**)
+| _none_
+
+| `siteDir`
+| Maven site output directory (**required**)
+| _none_
+|===
+
+[source,shell]
+----
+mvn ike:copy-docs -DgeneratedDocsDir=target/ike-doc/html -DsiteDir=target/site
+----
+
+=== `ike:fix-svg`
+
+Removes bare `<rect/>` elements that Mermaid emits in SVG output.
+These empty rectangles render as visible artifacts in Prince and other
+PDF renderers.
+Default phase: `process-resources`.
+
+[cols="3,4,3",options="header"]
+|===
+| Parameter | Description | Default
+
+| `htmlFile`
+| The HTML file to process (**required**)
+| _none_
+
+| `skip`
+| Skip execution
+| `false`
+|===
+
+[source,shell]
+----
+mvn ike:fix-svg -DhtmlFile=target/ike-doc/html/index.html
+----

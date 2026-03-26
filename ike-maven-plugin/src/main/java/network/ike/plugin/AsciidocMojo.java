@@ -172,6 +172,16 @@ public class AsciidocMojo extends AbstractMojo {
     @Parameter(property = "ike.asciidoc.strict", defaultValue = "false")
     boolean strict;
 
+    // ── Output mode ──────────────────────────────────────────────────
+
+    /**
+     * Generate standalone HTML documents (with head/body shell).
+     * Set to {@code false} for embedded body fragments suitable for
+     * Doxia integration via {@code generatedSiteDirectory}.
+     */
+    @Parameter(property = "ike.asciidoc.standalone", defaultValue = "true")
+    boolean standalone;
+
     // ── Additional attributes from POM ────────────────────────────────
 
     /** Additional AsciiDoc attributes merged with defaults. */
@@ -269,8 +279,14 @@ public class AsciidocMojo extends AbstractMojo {
     private void convertBackend(Asciidoctor asciidoctor, Backend backend, boolean singleFile)
             throws MojoExecutionException {
 
-        String subdir = singleFile ? "html-single" : backend.outputSubdir();
-        File outDir = new File(outputDirectory, subdir);
+        File outDir;
+        if (!standalone && backend == Backend.HTML && !singleFile) {
+            // Embedded mode: write directly to outputDirectory for Doxia integration
+            outDir = outputDirectory;
+        } else {
+            String subdir = singleFile ? "html-single" : backend.outputSubdir();
+            outDir = new File(outputDirectory, subdir);
+        }
         outDir.mkdirs();
 
         getLog().info("  backend: " + backend.asciidoctorName()
@@ -301,6 +317,10 @@ public class AsciidocMojo extends AbstractMojo {
                 for (File src : sourceFiles) {
                     asciidoctor.convertFile(src, options);
                 }
+            }
+            // Embedded mode: rename .html → .xhtml for Doxia XHTML parser
+            if (!standalone && backend == Backend.HTML && !singleFile) {
+                renameHtmlToXhtml(outDir);
             }
         } catch (MojoExecutionException e) {
             throw e;
@@ -402,6 +422,7 @@ public class AsciidocMojo extends AbstractMojo {
                 .toDir(outDir)
                 .safe(SafeMode.UNSAFE)
                 .mkDirs(true)
+                .standalone(standalone)
                 .baseDir(baseDir)
                 .attributes(attrs);
 
@@ -413,6 +434,69 @@ public class AsciidocMojo extends AbstractMojo {
         }
 
         return builder.build();
+    }
+
+    /** HTML void elements that must be self-closed for XHTML compliance. */
+    private static final java.util.regex.Pattern VOID_ELEMENT =
+            java.util.regex.Pattern.compile(
+                    "<(area|base|br|col|embed|hr|img|input|link|meta|source|track|wbr)"
+                    + "(\\s[^>]*)?>",
+                    java.util.regex.Pattern.CASE_INSENSITIVE);
+
+    /**
+     * Convert embedded HTML fragments to Doxia-compatible XHTML files:
+     * wrap in a single root {@code <div>}, self-close void elements,
+     * and rename {@code .html → .xhtml} so the Doxia XHTML parser
+     * discovers them in {@code generatedSiteDirectory/xhtml/}.
+     */
+    private void renameHtmlToXhtml(File dir) throws MojoExecutionException {
+        File[] htmlFiles = dir.listFiles((d, name) -> name.endsWith(".html"));
+        if (htmlFiles == null) return;
+        for (File html : htmlFiles) {
+            try {
+                String content = Files.readString(html.toPath());
+                // Self-close void elements: <br> → <br/>, <col ...> → <col .../>
+                content = VOID_ELEMENT.matcher(content).replaceAll(mr -> {
+                    String tag = mr.group(1);
+                    String attrs = mr.group(2);
+                    if (attrs == null || attrs.isEmpty()) return "<" + tag + "/>";
+                    // Strip trailing space before closing
+                    return "<" + tag + attrs.stripTrailing() + "/>";
+                });
+                // Wrap in root <div> with an <h1> title (Sentry skin
+                // expects h1 for navigation). Extract title from first
+                // <h2> if present, or use the filename.
+                String title = extractTitle(content, html.getName());
+                String wrapped = "<div class=\"ike-asciidoc\">\n"
+                        + "<h1 id=\"doc-title\">" + title + "</h1>\n"
+                        + content + "\n</div>\n";
+                String xhtmlName = html.getName().replaceFirst("\\.html$", ".xhtml");
+                Path xhtml = html.toPath().resolveSibling(xhtmlName);
+                Files.writeString(xhtml, wrapped);
+                Files.delete(html.toPath());
+                getLog().debug("Wrapped and renamed " + html.getName() + " → " + xhtmlName);
+            } catch (IOException e) {
+                throw new MojoExecutionException(
+                        "Failed to convert " + html + " to XHTML", e);
+            }
+        }
+    }
+
+    /** Extract a title from embedded HTML content for use as the page h1. */
+    private String extractTitle(String html, String fallbackFilename) {
+        // Asciidoctor's embedded mode omits the doc title (= Title) but
+        // includes section titles as <h2>. The first <h2> is usually the
+        // first section heading, not the doc title. Instead, look for the
+        // document title in the preamble or use the AsciiDoc = Title which
+        // Asciidoctor puts in a <h1> with id="document-title" even in
+        // embedded mode if showtitle is set. Failing that, derive from
+        // the source filename.
+        var h1 = java.util.regex.Pattern.compile("<h1[^>]*>([^<]+)</h1>")
+                .matcher(html);
+        if (h1.find()) return h1.group(1);
+        // Fall back to filename without extension
+        return fallbackFilename.replaceFirst("\\.[^.]+$", "")
+                .replace('-', ' ').replace('_', ' ');
     }
 
     private String outputExtension(Backend backend) {

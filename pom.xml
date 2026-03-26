@@ -123,30 +123,29 @@
                     <groupId>network.ike</groupId>
                     <artifactId>ike-maven-plugin</artifactId>
                     <version>${project.version}</version>
+                    <executions>
+                        <execution>
+                            <id>render-site-content</id>
+                            <phase>pre-site</phase>
+                            <goals><goal>asciidoc</goal></goals>
+                            <configuration>
+                                <sourceDirectory>${project.basedir}/src/site/asciidoc</sourceDirectory>
+                                <outputDirectory>${project.build.directory}/generated-site/xhtml</outputDirectory>
+                                <standalone>false</standalone>
+                                <skipPrawn>true</skipPrawn>
+                                <skipDocbook>true</skipDocbook>
+                                <skipHtmlSingle>true</skipHtmlSingle>
+                            </configuration>
+                        </execution>
+                    </executions>
                 </plugin>
                 <plugin>
                     <artifactId>maven-site-plugin</artifactId>
                     <version>3.21.0</version>
+                    <configuration>
+                        <generatedSiteDirectory>${project.build.directory}/generated-site</generatedSiteDirectory>
+                    </configuration>
                     <dependencies>
-                        <!-- AsciiDoc support for site content -->
-                        <dependency>
-                            <groupId>org.asciidoctor</groupId>
-                            <artifactId>asciidoctor-converter-doxia-module</artifactId>
-                            <version>3.2.0</version>
-                            <exclusions>
-                                <exclusion>
-                                    <groupId>org.jruby</groupId>
-                                    <artifactId>jruby-base</artifactId>
-                                </exclusion>
-                            </exclusions>
-                        </dependency>
-                        <!-- JRuby 10 — replaces transitive 9.4.x to eliminate
-                             sun.misc.Unsafe deprecation warnings on Java 25 -->
-                        <dependency>
-                            <groupId>org.jruby</groupId>
-                            <artifactId>jruby</artifactId>
-                            <version>${jruby.version}</version>
-                        </dependency>
                         <!-- Sentry skin tools — provides Velocity context
                              variables ($headElement, $bodyElement, etc.) -->
                         <dependency>

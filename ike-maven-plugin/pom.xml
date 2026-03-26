@@ -213,6 +213,12 @@
                     </dependency>
                 </dependencies>
             </plugin>
+            <!-- Self-invoke: uses the installed SNAPSHOT to render site content.
+                 Requires mvn install before mvn site (same as ike:release). -->
+            <plugin>
+                <groupId>network.ike</groupId>
+                <artifactId>ike-maven-plugin</artifactId>
+            </plugin>
         </plugins>
     </build>
 </project>
