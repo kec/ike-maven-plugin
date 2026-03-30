@@ -6,6 +6,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -146,10 +148,17 @@ class WsReleaseIntegrationTest {
 
     @Test
     void checkpoint_createdBeforeRelease() throws Exception {
-        // Exercise checkpoint writing via the WsCheckpointMojo
-        // (WsReleaseMojo calls writeCheckpoint internally but also
-        //  goes on to run mvn ike:release which we can't do in tests)
-        WsCheckpointMojo cpMojo = new WsCheckpointMojo();
+        // Exercise checkpoint writing via the WsCheckpointMojo using a
+        // simulated build (no real Maven subprocess — just creates the tag).
+        WsCheckpointMojo cpMojo = new WsCheckpointMojo() {
+            @Override
+            protected void checkpointComponent(File dir, String checkpointLabel)
+                    throws MojoExecutionException {
+                ReleaseSupport.exec(dir, getLog(),
+                        "git", "tag", "-a", "checkpoint/" + checkpointLabel,
+                        "-m", "Simulated checkpoint " + checkpointLabel);
+            }
+        };
         cpMojo.manifest = helper.workspaceYaml().toFile();
         cpMojo.name = "pre-release-test";
 

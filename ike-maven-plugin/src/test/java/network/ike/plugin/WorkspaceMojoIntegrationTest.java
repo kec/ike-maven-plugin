@@ -1,5 +1,6 @@
 package network.ike.plugin;
 
+import org.apache.maven.plugin.MojoExecutionException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -245,9 +246,26 @@ class WorkspaceMojoIntegrationTest {
 
     // ── WsCheckpointMojo ──────────────────────────────────────────────
 
+    /**
+     * Subclass that overrides {@code checkpointComponent} to simulate a
+     * build without invoking a real Maven subprocess: creates the expected
+     * annotated tag at the current HEAD so the mojo can read its SHA.
+     */
+    private static WsCheckpointMojo checkpointMojoWithSimulatedBuild() {
+        return new WsCheckpointMojo() {
+            @Override
+            protected void checkpointComponent(File dir, String checkpointLabel)
+                    throws MojoExecutionException {
+                ReleaseSupport.exec(dir, getLog(),
+                        "git", "tag", "-a", "checkpoint/" + checkpointLabel,
+                        "-m", "Simulated checkpoint " + checkpointLabel);
+            }
+        };
+    }
+
     @Test
     void wsCheckpoint_writesYamlFile() throws Exception {
-        WsCheckpointMojo mojo = new WsCheckpointMojo();
+        WsCheckpointMojo mojo = checkpointMojoWithSimulatedBuild();
         mojo.manifest = helper.workspaceYaml().toFile();
         mojo.name = "test-cp";
 
@@ -264,21 +282,22 @@ class WorkspaceMojoIntegrationTest {
     }
 
     @Test
-    void wsCheckpoint_withTag_createsGitTags() throws Exception {
-        WsCheckpointMojo mojo = new WsCheckpointMojo();
+    void wsCheckpoint_yamlContainsVersionTagAndSha() throws Exception {
+        WsCheckpointMojo mojo = checkpointMojoWithSimulatedBuild();
         mojo.manifest = helper.workspaceYaml().toFile();
-        mojo.name = "tagged-cp";
-        mojo.tag = true;
+        mojo.name = "test-cp2";
 
         mojo.execute();
 
-        // Verify git tags exist in each component
-        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
-            String expectedTag = "checkpoint/tagged-cp/" + name;
-            String tags = execCapture(tempDir.resolve(name),
-                    "git", "tag", "-l", expectedTag);
-            assertThat(tags.strip()).isEqualTo(expectedTag);
-        }
+        Path checkpointFile = tempDir.resolve("checkpoints")
+                .resolve("checkpoint-test-cp2.yaml");
+        String content = Files.readString(checkpointFile, StandardCharsets.UTF_8);
+
+        // YAML should have version, tag path, and SHA for each component
+        assertThat(content).contains("version: \"");
+        assertThat(content).contains("tag: \"checkpoint/");
+        assertThat(content).contains("sha: \"");
+        assertThat(content).contains("branch: \"");
     }
 
     // ── WsReleaseMojo ───────────────────────────────────────────────

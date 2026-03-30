@@ -48,7 +48,9 @@ class CheckpointSupportTest {
     }
 
     @Test
-    void buildCheckpointYaml_dirtyComponent_flagged() {
+    void buildCheckpointYaml_dirtyFlagDoesNotAppearInOutput() {
+        // Checkpoints require a clean worktree; the dirty field in
+        // ComponentSnapshot is informational only and is not written to YAML.
         ComponentSnapshot snap = new ComponentSnapshot(
                 "ike-docs", "aaa", "aaa",
                 "feature/docs", "1.0-SNAPSHOT", true,
@@ -59,8 +61,9 @@ class CheckpointSupportTest {
                 List.of(snap), List.of());
 
         assertThat(yaml)
-                .contains("      dirty: true")
-                .contains("# WARNING: working tree had uncommitted changes");
+                .contains("    ike-docs:")
+                .contains("      sha: \"aaa\"")
+                .doesNotContain("dirty:");
     }
 
     @Test
@@ -134,20 +137,6 @@ class CheckpointSupportTest {
                 .contains("    beta:");
     }
 
-    // ── checkpointTagName ───────────────────────────────────────────
-
-    @Test
-    void checkpointTagName_standardFormat() {
-        assertThat(WsCheckpointMojo.checkpointTagName("sprint-42", "ike-pipeline"))
-                .isEqualTo("checkpoint/sprint-42/ike-pipeline");
-    }
-
-    @Test
-    void checkpointTagName_preReleaseFormat() {
-        assertThat(WsCheckpointMojo.checkpointTagName("pre-release-20260320", "ike-docs"))
-                .isEqualTo("checkpoint/pre-release-20260320/ike-docs");
-    }
-
     // ── checkpointFileName ──────────────────────────────────────────
 
     @Test
@@ -162,46 +151,4 @@ class CheckpointSupportTest {
                 .isEqualTo("checkpoint-pre-release-20260320-100000.yaml");
     }
 
-    // ── formatComponentStatus ────────────────────────────────────────
-
-    @Test
-    void formatComponentStatus_cleanWithTag() {
-        String status = WsCheckpointMojo.formatComponentStatus(
-                "ike-pipeline", "abc123d", "main", false,
-                "checkpoint/sprint-42/ike-pipeline");
-
-        assertThat(status)
-                .isEqualTo("ike-pipeline [abc123d] main → tagged checkpoint/sprint-42/ike-pipeline");
-    }
-
-    @Test
-    void formatComponentStatus_cleanNoTag() {
-        String status = WsCheckpointMojo.formatComponentStatus(
-                "ike-pipeline", "abc123d", "main", false, null);
-
-        assertThat(status)
-                .isEqualTo("ike-pipeline [abc123d] main")
-                .doesNotContain("[DIRTY]")
-                .doesNotContain("tagged");
-    }
-
-    @Test
-    void formatComponentStatus_dirty() {
-        String status = WsCheckpointMojo.formatComponentStatus(
-                "ike-docs", "def456", "feature/docs", true, null);
-
-        assertThat(status)
-                .isEqualTo("ike-docs [def456] feature/docs [DIRTY]");
-    }
-
-    @Test
-    void formatComponentStatus_dirtyIgnoresTag() {
-        // Dirty components should not be tagged, but if tag is passed,
-        // it formats as tagged (caller decides whether to tag)
-        String status = WsCheckpointMojo.formatComponentStatus(
-                "ike-docs", "def456", "main", true,
-                "checkpoint/test/ike-docs");
-
-        assertThat(status).contains("tagged");
-    }
 }

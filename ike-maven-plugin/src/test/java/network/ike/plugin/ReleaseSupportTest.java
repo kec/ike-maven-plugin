@@ -745,33 +745,41 @@ class ReleaseSupportTest {
     // ── deriveCheckpointVersion ─────────────────────────────────────
 
     @Test
-    void deriveCheckpointVersion_noExistingTags(@TempDir Path tmpDir) throws Exception {
+    void deriveCheckpointVersion_usesShortSha(@TempDir Path tmpDir) throws Exception {
         initGitRepo(tmpDir);
+        String shortSha = execCapture(tmpDir, "git", "rev-parse", "--short", "HEAD");
 
         String version = ReleaseSupport.deriveCheckpointVersion(
                 "2.0.0-SNAPSHOT", tmpDir.toFile());
 
         assertThat(version)
                 .startsWith("2.0.0-checkpoint.")
-                .endsWith(".1");
+                .endsWith("." + shortSha);
     }
 
     @Test
-    void deriveCheckpointVersion_incrementsSequence(@TempDir Path tmpDir) throws Exception {
+    void deriveCheckpointVersion_stripsSnapshot(@TempDir Path tmpDir) throws Exception {
+        initGitRepo(tmpDir);
+        String shortSha = execCapture(tmpDir, "git", "rev-parse", "--short", "HEAD");
+
+        String version = ReleaseSupport.deriveCheckpointVersion(
+                "1.127.2-SNAPSHOT", tmpDir.toFile());
+
+        assertThat(version).startsWith("1.127.2-checkpoint.");
+        assertThat(version).endsWith("." + shortSha);
+        assertThat(version).doesNotContain("SNAPSHOT");
+    }
+
+    @Test
+    void deriveCheckpointVersion_deterministicAcrossCalls(@TempDir Path tmpDir)
+            throws Exception {
         initGitRepo(tmpDir);
 
-        // Derive version first to get the expected tag name
-        String version1 = ReleaseSupport.deriveCheckpointVersion(
-                "2.0.0-SNAPSHOT", tmpDir.toFile());
+        // Same commit → same version every time (no sequence counter race)
+        String v1 = ReleaseSupport.deriveCheckpointVersion("3.0.0-SNAPSHOT", tmpDir.toFile());
+        String v2 = ReleaseSupport.deriveCheckpointVersion("3.0.0-SNAPSHOT", tmpDir.toFile());
 
-        // Create that tag
-        exec(tmpDir, "git", "tag", "checkpoint/" + version1);
-
-        // Derive again — should increment sequence
-        String version2 = ReleaseSupport.deriveCheckpointVersion(
-                "2.0.0-SNAPSHOT", tmpDir.toFile());
-
-        assertThat(version2).endsWith(".2");
+        assertThat(v1).isEqualTo(v2);
     }
 
     // ── resolveMavenWrapper ─────────────────────────────────────────

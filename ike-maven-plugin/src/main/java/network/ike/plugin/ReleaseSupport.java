@@ -496,23 +496,23 @@ class ReleaseSupport {
     /**
      * Derive a checkpoint version from the current POM version.
      *
-     * <p>Format: {@code {base}-checkpoint.{yyyyMMdd}.{seq}} where
+     * <p>Format: {@code {base}-checkpoint.{yyyyMMdd}.{shortSha}} where
      * {@code base} is the POM version minus {@code -SNAPSHOT}, and
-     * {@code seq} is auto-incremented if a tag for the same date
-     * already exists.
+     * {@code shortSha} is the abbreviated SHA of the current HEAD commit.
+     *
+     * <p>This scheme is fully deterministic — the same commit on any
+     * machine always produces the same version string. No tag-sequence
+     * coordination across machines is required.
      *
      * @param pomVersion current POM version (may include -SNAPSHOT)
-     * @param gitRoot    git repository root (for tag existence checks)
+     * @param gitRoot    git repository root (for HEAD SHA lookup)
      */
     static String deriveCheckpointVersion(String pomVersion, File gitRoot)
             throws MojoExecutionException {
         String base = pomVersion.replace("-SNAPSHOT", "");
         String date = LocalDate.now().format(CHECKPOINT_DATE_FMT);
-        int seq = 1;
-        while (tagExists(gitRoot, "checkpoint/" + base + "-checkpoint." + date + "." + seq)) {
-            seq++;
-        }
-        return base + "-checkpoint." + date + "." + seq;
+        String shortSha = execCapture(gitRoot, "git", "rev-parse", "--short", "HEAD");
+        return base + "-checkpoint." + date + "." + shortSha;
     }
 
     /**

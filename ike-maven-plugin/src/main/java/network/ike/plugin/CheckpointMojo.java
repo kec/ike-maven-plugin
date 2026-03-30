@@ -10,26 +10,32 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Create an immutable checkpoint.
+ * Per-component checkpoint engine — build, tag, and deploy a single repo.
  *
- * <p>A checkpoint is a lightweight, tagged snapshot — no release
- * branch ceremony, no GPG signing. The workflow:
+ * <p>This goal is the per-component engine invoked by {@code ike:ws-checkpoint}
+ * for each workspace component. In normal workspace usage, prefer
+ * {@code ike:ws-checkpoint} which orchestrates this goal across all
+ * components in topological order.
+ *
+ * <p>The workflow for a single repository:
  * <ol>
  *   <li>Derive checkpoint version from current SNAPSHOT</li>
  *   <li>Set POM versions, resolve {@code ${project.version}}</li>
- *   <li>Build and verify</li>
  *   <li>Commit, tag with {@code checkpoint/<version>}</li>
- *   <li>Deploy to Nexus (no GPG)</li>
+ *   <li>Run {@code mvnw clean deploy} — build and publish to Nexus (no GPG)</li>
  *   <li>Optionally deploy site to immutable checkpoint URL</li>
- *   <li>Restore SNAPSHOT version</li>
+ *   <li>Restore SNAPSHOT version and commit</li>
+ *   <li>Push tag to origin</li>
  * </ol>
  *
- * <p>Usage:
+ * <p>Direct usage (single repo):
  * <pre>
  * mvn ike:checkpoint
  * mvn ike:checkpoint -DdryRun=true
- * mvn ike:checkpoint -DdeploySite=false
+ * mvn ike:checkpoint -DcheckpointLabel=1.2.3-checkpoint.2026-01-01.1
  * </pre>
+ *
+ * @see WsCheckpointMojo the workspace-level goal that orchestrates this one
  */
 @Mojo(name = "checkpoint", requiresProject = false, aggregator = true, threadSafe = true)
 public class CheckpointMojo extends AbstractMojo {
