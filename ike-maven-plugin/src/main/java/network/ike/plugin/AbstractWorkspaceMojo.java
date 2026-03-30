@@ -164,11 +164,25 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
             return currentValue.trim();
         }
 
+        // Try System.console() first (real terminal)
         java.io.Console console = System.console();
         if (console != null) {
             String input = console.readLine("%s: ", promptLabel);
             if (input != null && !input.isBlank()) {
                 return input.trim();
+            }
+        } else {
+            // IDE fallback — System.in is connected to IntelliJ's Run console
+            getLog().info(promptLabel + ": ");
+            try {
+                java.io.BufferedReader reader = new java.io.BufferedReader(
+                        new java.io.InputStreamReader(System.in));
+                String input = reader.readLine();
+                if (input != null && !input.isBlank()) {
+                    return input.trim();
+                }
+            } catch (java.io.IOException e) {
+                // Fall through to error
             }
         }
 

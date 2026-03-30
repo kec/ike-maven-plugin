@@ -35,7 +35,9 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("");
         getLog().info("  ── Gitflow Goals ────────────────────────────────────────");
         getLog().info("  ike:feature-start                               Create feature branch across repos");
+        getLog().info("  ike:feature-start-dry-run                       Preview feature branch creation (interactive)");
         getLog().info("  ike:feature-finish                              Merge feature branch to main");
+        getLog().info("  ike:feature-finish-dry-run                      Preview feature branch merge (interactive)");
         getLog().info("  ike:ws-checkpoint                               Record multi-repo checkpoint (SHAs+versions)");
         getLog().info("  ike:ws-release                                  Release all dirty components in topo order");
         getLog().info("");
