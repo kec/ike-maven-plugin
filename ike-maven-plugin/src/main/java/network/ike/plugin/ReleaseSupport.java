@@ -220,6 +220,37 @@ class ReleaseSupport {
     }
 
     /**
+     * Stamp {@code <project.build.outputTimestamp>} in the root POM to
+     * {@code newTimestamp}, enabling reproducible builds for the release.
+     *
+     * <p>The property must already exist in the POM (inherited from
+     * ike-parent). If it is absent this method is a no-op with a warning.
+     *
+     * @param pomFile      the root POM to update
+     * @param newTimestamp ISO-8601 UTC timestamp, e.g. {@code 2026-03-30T12:00:00Z}
+     * @param log          Maven log (used for warnings only)
+     */
+    static void stampOutputTimestamp(File pomFile, String newTimestamp, Log log)
+            throws MojoExecutionException {
+        try {
+            String content = Files.readString(pomFile.toPath(), StandardCharsets.UTF_8);
+            java.util.regex.Pattern pat = java.util.regex.Pattern.compile(
+                    "(<project\\.build\\.outputTimestamp>)[^<]*(</project\\.build\\.outputTimestamp>)");
+            java.util.regex.Matcher m = pat.matcher(content);
+            if (!m.find()) {
+                log.warn("project.build.outputTimestamp not found in " + pomFile
+                        + " — reproducible build stamp skipped");
+                return;
+            }
+            String updated = m.replaceFirst("$1" + newTimestamp + "$2");
+            Files.writeString(pomFile.toPath(), updated, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new MojoExecutionException(
+                    "Failed to stamp outputTimestamp in " + pomFile, e);
+        }
+    }
+
+    /**
      * Replace the project's own {@code <version>old</version>} with
      * {@code <version>new</version>}, skipping any version inside
      * the {@code <parent>} block.

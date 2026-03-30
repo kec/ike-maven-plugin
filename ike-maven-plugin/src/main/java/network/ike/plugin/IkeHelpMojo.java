@@ -39,6 +39,7 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  ike:feature-finish                              Merge feature branch to main");
         getLog().info("  ike:feature-finish-dry-run                      Preview feature branch merge (interactive)");
         getLog().info("  ike:ws-checkpoint                               Record multi-repo checkpoint (SHAs+versions)");
+        getLog().info("  ike:ws-checkpoint-dry-run                       Preview checkpoint without writing files or tags");
         getLog().info("  ike:ws-release                                  Release all dirty components in topo order");
         getLog().info("");
         getLog().info("  ── Release Goals ────────────────────────────────────────");
@@ -68,10 +69,11 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  -Dfrom=manifest        Switch repos to match workspace.yaml");
         getLog().info("  -DdryRun=true          Show plan without executing");
         getLog().info("");
-        getLog().info("Options for ike:ws-checkpoint:");
+        getLog().info("Options for ike:ws-checkpoint / ike:ws-checkpoint-dry-run:");
         getLog().info("  -Dname=<name>          Checkpoint name (required)");
         getLog().info("  -Dtag=true             Tag each component");
         getLog().info("  -Dpush=true            Push tags to origin");
+        getLog().info("  -DdryRun=true          Preview without writing files or tags");
         getLog().info("");
         getLog().info("Options for ike:ws-release:");
         getLog().info("  -Dcomponent=<name>     Release one specific component");

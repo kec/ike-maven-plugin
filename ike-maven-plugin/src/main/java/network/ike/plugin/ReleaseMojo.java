@@ -7,6 +7,8 @@ import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 /**
@@ -130,10 +132,18 @@ public class ReleaseMojo extends AbstractMojo {
         // Validate clean worktree
         ReleaseSupport.requireCleanWorktree(gitRoot);
 
+        // Derive timestamp from the current HEAD commit, not wall-clock time.
+        // This ensures two independent builds from the same tag produce the
+        // same project.build.outputTimestamp value — which is the reproducibility
+        // guarantee. Wall-clock time would defeat the purpose.
+        String releaseTimestamp = resolveCommitTimestamp(gitRoot);
+
         if (dryRun) {
             getLog().info("[DRY RUN] Would create branch: " + releaseBranch);
             getLog().info("[DRY RUN] Would set version: " + oldVersion +
                     " -> " + releaseVersion);
+            getLog().info("[DRY RUN] Would stamp project.build.outputTimestamp: "
+                    + releaseTimestamp);
             getLog().info("[DRY RUN] Would resolve ${project.version} -> " +
                     releaseVersion + " in all POMs");
             getLog().info("[DRY RUN] Would run: mvnw clean verify -B");
@@ -162,6 +172,10 @@ public class ReleaseMojo extends AbstractMojo {
         // Set version
         getLog().info("Setting version: " + oldVersion + " -> " + releaseVersion);
         ReleaseSupport.setPomVersion(rootPom, oldVersion, releaseVersion);
+
+        // Stamp reproducible build timestamp
+        getLog().info("Stamping project.build.outputTimestamp: " + releaseTimestamp);
+        ReleaseSupport.stampOutputTimestamp(rootPom, releaseTimestamp, getLog());
 
         // WORKAROUND: Maven 4 consumer POM doesn't resolve ${project.version}
         // in <build><plugins>, <pluginManagement>, or <dependencyManagement>.
@@ -368,6 +382,37 @@ public class ReleaseMojo extends AbstractMojo {
         }
         getLog().info("  Merged to main");
         getLog().info("  Next version: " + nextVersion);
+    }
+
+    /**
+     * Return the ISO-8601 UTC timestamp of the current HEAD commit.
+     *
+     * <p>Using the commit timestamp (not wall-clock time) for
+     * {@code project.build.outputTimestamp} ensures that two independent
+     * builds from the same tag produce identical byte-for-byte output.
+     * Wall-clock time would differ between the developer build and the
+     * TeamCity verification build, defeating reproducibility.
+     *
+     * <p>Falls back to the current wall-clock time if git is unavailable.
+     */
+    private String resolveCommitTimestamp(File gitRoot) {
+        try {
+            // %cI = commit timestamp in strict ISO 8601 format
+            String raw = ReleaseSupport.execCapture(gitRoot,
+                    "git", "log", "-1", "--format=%cI", "HEAD");
+            // Normalise to the yyyy-MM-dd'T'HH:mm:ss'Z' form Maven expects
+            return DateTimeFormatter
+                    .ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                    .withZone(ZoneOffset.UTC)
+                    .format(java.time.OffsetDateTime.parse(raw).toInstant());
+        } catch (Exception e) {
+            getLog().warn("Could not read HEAD commit timestamp; falling back to wall-clock: "
+                    + e.getMessage());
+            return DateTimeFormatter
+                    .ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                    .withZone(ZoneOffset.UTC)
+                    .format(Instant.now());
+        }
     }
 
     private void logAudit(File gitRoot, File mvnw, String branch,

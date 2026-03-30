@@ -51,6 +51,13 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
     @Parameter(property = "push", defaultValue = "false")
     boolean push;
 
+    /**
+     * Show what the checkpoint would do without writing files or creating tags.
+     * Set automatically by {@code ike:ws-checkpoint-dry-run}.
+     */
+    @Parameter(property = "dryRun", defaultValue = "false")
+    boolean dryRun;
+
     /** Creates this goal instance. */
     public WsCheckpointMojo() {}
 
@@ -103,8 +110,8 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
                     compName, sha, shortSha, branch, version, dirty,
                     component.type(), composite));
 
-            // Tag if requested
-            if (tag && !dirty) {
+            // Tag if requested (skipped in dry-run)
+            if (!dryRun && tag && !dirty) {
                 String tagName = checkpointTagName(name, compName);
                 try {
                     ReleaseSupport.exec(dir, getLog(),
@@ -123,8 +130,11 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
                 }
             } else {
                 String dirtyMark = dirty ? " [DIRTY]" : "";
+                String dryRunTag = (dryRun && tag && !dirty)
+                        ? " → [DRY RUN] would tag " + checkpointTagName(name, compName)
+                        : "";
                 getLog().info("  ✓ " + compName + " [" + shortSha + "] "
-                        + branch + dirtyMark);
+                        + branch + dirtyMark + dryRunTag);
             }
         }
 
@@ -133,6 +143,24 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
                 name, timestamp, author,
                 graph.manifest().schemaVersion(),
                 snapshots, absentComponents);
+
+        // Dry-run: show the plan and exit without writing anything
+        if (dryRun) {
+            getLog().info("");
+            getLog().info("[DRY RUN] Checkpoint file would be written to:");
+            getLog().info("[DRY RUN]   checkpoints/" + checkpointFileName(name));
+            getLog().info("");
+            getLog().info("[DRY RUN] Contents:");
+            yamlContent.lines().forEach(line ->
+                    getLog().info("[DRY RUN]   " + line));
+            getLog().info("");
+            int dirty = (int) snapshots.stream().filter(ComponentSnapshot::dirty).count();
+            if (dirty > 0) {
+                getLog().warn("[DRY RUN] " + dirty
+                        + " component(s) have uncommitted changes — tags would be skipped");
+            }
+            return;
+        }
 
         // Write checkpoint file
         int recorded = snapshots.size();
