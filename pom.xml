@@ -299,8 +299,11 @@
                         <artifactId>maven-gpg-plugin</artifactId>
                         <version>3.2.8</version>
                         <configuration>
-                            <!-- Bouncy Castle signer: no gpg-agent or pinentry needed;
-                                 reads key directly, passphrase from MAVEN_GPG_PASSPHRASE -->
+                            <!-- Use Bouncy Castle signer for parallel-safe signing
+                                 without gpg-agent contention.
+                                 Reads key from gpg.keyFilePath, passphrase from
+                                 MAVEN_GPG_PASSPHRASE env var. Do NOT switch to
+                                 native gpg — it breaks parallel reactor builds. -->
                             <signer>bc</signer>
                         </configuration>
                         <executions>
