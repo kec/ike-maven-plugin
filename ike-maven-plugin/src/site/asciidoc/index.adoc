@@ -67,10 +67,6 @@ with parameter prompts.
 | Auto-generate BOM from `ike-parent` dependencyManagement
 | <<release>>
 
-| `ike:checkpoint`
-| Single-repo immutable checkpoint
-| <<release>>
-
 | `ike:deploy-site`
 | Deploy site to versioned URL
 | <<release>>
@@ -370,18 +366,6 @@ Typically bound to `generate-resources` in the `ike-bom` module.
 ----
 mvn ike:generate-bom
 mvn ike:generate-bom -Dbom.source=ike-parent
-----
-
-=== `ike:checkpoint`
-
-Creates an immutable checkpoint for a single repository, capturing the current
-state for reproducibility.
-
-No required parameters.
-
-[source,shell]
-----
-mvn ike:checkpoint
 ----
 
 === `ike:deploy-site`

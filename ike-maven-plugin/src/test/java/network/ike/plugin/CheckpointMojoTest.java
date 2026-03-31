@@ -1,6 +1,7 @@
 package network.ike.plugin;
 
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.logging.SystemStreamLog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -13,16 +14,12 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Tests for {@link CheckpointMojo}.
+ * Tests for {@link CheckpointSupport}.
  *
  * <p>The checkpoint workflow runs subprocesses ({@code mvn clean deploy})
  * that cannot run in unit tests. These tests exercise the dry-run paths
  * (which cover parameter derivation, audit logging, and all dry-run
  * branches) and early validation logic (clean worktree check).
- *
- * <p>The non-dry-run path proceeds into subprocess territory and will
- * fail when no Maven wrapper is available, but we can still verify that
- * validation gates (e.g., clean worktree) fire first.
  */
 class CheckpointMojoTest {
 
@@ -35,15 +32,15 @@ class CheckpointMojoTest {
     void dryRun_completesWithoutChanges() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-
         String headBefore = execCapture(tempDir, "git", "rev-parse", "HEAD");
         String tagsBefore = execCapture(tempDir, "git", "tag", "-l");
         String pomBefore = Files.readString(tempDir.resolve("pom.xml"),
                 StandardCharsets.UTF_8);
 
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, false, new SystemStreamLog()))
+                .doesNotThrowAnyException();
 
         // No commits, tags, or POM changes
         assertThat(execCapture(tempDir, "git", "rev-parse", "HEAD"))
@@ -59,98 +56,70 @@ class CheckpointMojoTest {
     void dryRun_withCustomLabel() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.checkpointLabel = "custom-label-42";
-
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "custom-label-42",
+                false, false, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void dryRun_skipVerifyTrue() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.skipVerify = true;
-
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, true, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void dryRun_deploySiteFalse() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.deploySite = false;
-
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, false, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void dryRun_deploySiteTrue() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.deploySite = true;
-
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                true, false, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
-
-    @Test
-    void dryRun_blankLabel_derivesFromVersion() throws Exception {
-        createCheckpointProject(tempDir);
-
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.checkpointLabel = "   ";
-
-        // Blank label should be treated as unset — auto-derive
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
-    }
-
-    // ── Dry-run: combined flags ────────────────────────────────────
 
     @Test
     void dryRun_deploySiteTrue_skipVerifyFalse() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.deploySite = true;
-        mojo.skipVerify = false;
-
-        // Covers L83-84 (skipVerify=false) and L88-90 (deploySite=true)
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                true, false, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void dryRun_deploySiteFalse_skipVerifyTrue() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.deploySite = false;
-        mojo.skipVerify = true;
-
-        // Covers L85-86 (skipVerify=true) and L88 deploySite=false branch
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, true, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     @Test
     void dryRun_customLabel_deploySiteTrue() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        mojo.dryRun = true;
-        mojo.checkpointLabel = "my-checkpoint";
-        mojo.deploySite = true;
-        mojo.skipVerify = true;
-
-        // Custom label + deploySite=true + skipVerify=true
-        assertThatCode(mojo::execute).doesNotThrowAnyException();
+        assertThatCode(() -> CheckpointSupport.dryRun(
+                tempDir.toFile(), "my-checkpoint",
+                true, true, new SystemStreamLog()))
+                .doesNotThrowAnyException();
     }
 
     // ── Non-dry-run validation ──────────────────────────────────────
@@ -162,9 +131,9 @@ class CheckpointMojoTest {
         Files.writeString(tempDir.resolve("README.txt"), "modified content",
                 StandardCharsets.UTF_8);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-
-        assertThatThrownBy(mojo::execute)
+        assertThatThrownBy(() -> CheckpointSupport.checkpoint(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, false, new SystemStreamLog()))
                 .isInstanceOf(MojoExecutionException.class)
                 .hasMessageContaining("unstaged changes");
     }
@@ -176,9 +145,9 @@ class CheckpointMojoTest {
                 StandardCharsets.UTF_8);
         exec(tempDir, "git", "add", "staged.txt");
 
-        CheckpointMojo mojo = newMojo(tempDir);
-
-        assertThatThrownBy(mojo::execute)
+        assertThatThrownBy(() -> CheckpointSupport.checkpoint(
+                tempDir.toFile(), "2.0.0-checkpoint.20260330.abc1234",
+                false, false, new SystemStreamLog()))
                 .isInstanceOf(MojoExecutionException.class)
                 .hasMessageContaining("staged changes");
     }
@@ -187,13 +156,14 @@ class CheckpointMojoTest {
     void nonDryRun_cleanWorktree_proceedsToVersionSet() throws Exception {
         createCheckpointProject(tempDir);
 
-        CheckpointMojo mojo = newMojo(tempDir);
-        // No Maven wrapper available, so the Mojo will fail after
+        // No Maven wrapper available, so checkpoint will fail after
         // setting the version (when it tries to run mvnw). Verify
-        // that it got past the worktree check by observing the POM
-        // was modified (version set) or the error is about mvn/mvnw.
+        // that it got past the worktree check by observing the error
+        // is about mvn/mvnw, not about worktree state.
         try {
-            mojo.execute();
+            CheckpointSupport.checkpoint(tempDir.toFile(),
+                    "2.0.0-checkpoint.20260330.abc1234",
+                    false, false, new SystemStreamLog());
         } catch (MojoExecutionException e) {
             // Expected — no mvn/mvnw in temp dir
             // Should NOT be a worktree-related error
@@ -204,15 +174,6 @@ class CheckpointMojoTest {
     }
 
     // ── Helpers ──────────────────────────────────────────────────────
-
-    private CheckpointMojo newMojo(Path dir) {
-        CheckpointMojo mojo = new CheckpointMojo();
-        mojo.baseDir = dir.toFile();
-        mojo.deploySite = true;
-        mojo.dryRun = false;
-        mojo.skipVerify = false;
-        return mojo;
-    }
 
     private void createCheckpointProjectWithTrackedFile(Path dir) throws Exception {
         createCheckpointProject(dir);

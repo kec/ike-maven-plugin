@@ -42,7 +42,7 @@ import java.util.List;
  * <p>Usage: {@code mvn ike:release} (auto-derives version from POM),
  * or override with {@code mvn ike:release -DreleaseVersion=2}
  *
- * @see CheckpointMojo
+ * @see CheckpointSupport
  */
 @Mojo(name = "release", requiresProject = false, aggregator = true, threadSafe = true)
 public class ReleaseMojo extends AbstractMojo {

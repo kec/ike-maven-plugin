@@ -23,8 +23,7 @@ import java.util.LinkedHashSet;
  * then record the resulting checkpoint coordinates in a YAML file.
  *
  * <p>Each component is processed in topological order (dependencies before
- * dependents). For each component, {@code ike:checkpoint} is invoked in that
- * component's directory, which:
+ * dependents). For each component the checkpoint engine:
  * <ol>
  *   <li>Derives an immutable checkpoint version from the current SNAPSHOT</li>
  *   <li>Stamps the version, commits, and tags {@code checkpoint/<version>}</li>
@@ -43,7 +42,7 @@ import java.util.LinkedHashSet;
  * mvn ike:ws-checkpoint-dry-run -Dname=sprint-42
  * }</pre>
  *
- * @see CheckpointMojo the per-component engine invoked by this goal
+ * @see CheckpointSupport the per-component engine used by this goal
  */
 @Mojo(name = "ws-checkpoint", requiresProject = false, threadSafe = true)
 public class WsCheckpointMojo extends AbstractWorkspaceMojo {
@@ -55,6 +54,14 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
     /** Checkpoint name. Used in the YAML filename and component tag paths. */
     @Parameter(property = "name")
     String name;
+
+    /** Deploy site to the remote server for each component. Opt-in — requires SSH proxy. */
+    @Parameter(property = "deploySite", defaultValue = "false")
+    boolean deploySite;
+
+    /** Skip tests during the build ({@code -DskipTests}). */
+    @Parameter(property = "skipVerify", defaultValue = "false")
+    boolean skipVerify;
 
     /**
      * Show what the checkpoint would do without running builds, writing
@@ -124,13 +131,11 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
             if (dryRun) {
                 String shortSha = gitShortSha(dir);
                 String sha      = gitFullSha(dir);
-                File mvnw = ReleaseSupport.resolveMavenWrapper(dir, getLog());
                 getLog().info("  ✓ " + compName + " [" + shortSha + "] " + branch);
                 getLog().info("    [DRY RUN] " + snapshot
                         + " → " + checkpointVersion);
-                getLog().info("    [DRY RUN] Would run: " + mvnw.getName()
-                        + " ike:checkpoint -DcheckpointLabel="
-                        + checkpointVersion + " -B");
+                CheckpointSupport.dryRun(dir, checkpointVersion,
+                        deploySite, skipVerify, getLog());
                 snapshots.add(new ComponentSnapshot(
                         compName, sha, shortSha, branch,
                         checkpointVersion, false, component.type(), composite));
@@ -196,8 +201,8 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
     // ── Per-component checkpoint (overridable for tests) ──────────────
 
     /**
-     * Execute the per-component checkpoint. Invokes {@code ike:checkpoint}
-     * as a Maven subprocess in the component directory.
+     * Execute the per-component checkpoint. Calls {@link CheckpointSupport}
+     * directly — no subprocess spawn.
      *
      * <p>Override in tests to substitute a lighter-weight simulation
      * that creates the git tag without running a real build.
@@ -205,14 +210,12 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
      * @param dir             component git root
      * @param checkpointLabel version label (e.g.,
      *                        {@code 1.0.0-checkpoint.20260330.abc1234})
-     * @throws MojoExecutionException if the subprocess fails
+     * @throws MojoExecutionException if the checkpoint fails
      */
     protected void checkpointComponent(File dir, String checkpointLabel)
             throws MojoExecutionException {
-        File mvnw = ReleaseSupport.resolveMavenWrapper(dir, getLog());
-        ReleaseSupport.exec(dir, getLog(),
-                mvnw.getAbsolutePath(), "ike:checkpoint",
-                "-DcheckpointLabel=" + checkpointLabel, "-B");
+        CheckpointSupport.checkpoint(dir, checkpointLabel,
+                deploySite, skipVerify, getLog());
     }
 
     // ── YAML generation (pure, static, testable) ──────────────────────

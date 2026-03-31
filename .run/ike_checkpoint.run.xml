@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="ike:checkpoint" type="MavenRunConfiguration" factoryName="Maven">
+  <configuration default="false" name="ike:ws-checkpoint" type="MavenRunConfiguration" factoryName="Maven">
     <MavenSettings>
       <option name="myGeneralSettings" />
       <option name="myRunnerSettings" />
@@ -8,7 +8,7 @@
           <option name="workingDirPath" value="$PROJECT_DIR$" />
           <option name="goals">
             <list>
-              <option value="ike:checkpoint" />
+              <option value="ike:ws-checkpoint" />
             </list>
           </option>
           <option name="profilesMap">
