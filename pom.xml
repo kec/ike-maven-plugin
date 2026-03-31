@@ -19,7 +19,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-tooling</artifactId>
-    <version>43-SNAPSHOT</version>
+    <version>43</version>
     <packaging>pom</packaging>
 
     <name>IKE Tooling</name>
@@ -71,7 +71,7 @@
         <!-- Build -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <project.build.outputTimestamp>2026-03-31T03:14:21Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-03-31T03:21:53Z</project.build.outputTimestamp>
 
         <!-- Java -->
         <java.version>25</java.version>
