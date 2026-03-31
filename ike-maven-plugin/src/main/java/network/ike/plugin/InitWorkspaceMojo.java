@@ -88,11 +88,12 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             File gitDir = new File(dir, ".git");
 
             if (gitDir.exists()) {
-                // Already a git repo — still ensure wrapper is current
+                // Already a git repo — still ensure wrapper and jvm.config are current
                 getLog().info("  ✓ " + name + " — already initialized");
                 if (ensureMavenWrapper(dir, component, defaults)) {
                     wrappers++;
                 }
+                ensureJvmConfig(dir);
                 skipped++;
                 continue;
             }
@@ -114,6 +115,7 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
                 if (ensureMavenWrapper(dir, component, defaults)) {
                     wrappers++;
                 }
+                ensureJvmConfig(dir);
                 syncthing++;
             } else {
                 // Fresh clone
@@ -124,6 +126,7 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
                 if (ensureMavenWrapper(componentDir, component, defaults)) {
                     wrappers++;
                 }
+                ensureJvmConfig(componentDir);
                 cloned++;
             }
         }
@@ -328,6 +331,34 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
                 "%MAVEN_HOME%\\bin\\mvn.cmd" %*
                 """;
         Files.writeString(mvnwCmd, script, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Ensure {@code .mvn/jvm.config} exists with standard JVM flags.
+     * Only applies to Maven projects (must have a {@code pom.xml}).
+     * Does not overwrite an existing file.
+     */
+    private void ensureJvmConfig(File componentDir) {
+        File pomFile = new File(componentDir, "pom.xml");
+        if (!pomFile.exists()) {
+            return;
+        }
+
+        try {
+            Path mvnDir = componentDir.toPath().resolve(".mvn");
+            Path jvmConfig = mvnDir.resolve("jvm.config");
+
+            if (jvmConfig.toFile().exists()) {
+                return;
+            }
+
+            Files.createDirectories(mvnDir);
+            String config = "-Dpolyglotimpl.AttachLibraryFailureAction=ignore\n";
+            Files.writeString(jvmConfig, config, StandardCharsets.UTF_8);
+            getLog().info("    Created .mvn/jvm.config");
+        } catch (IOException e) {
+            getLog().warn("    Could not create jvm.config: " + e.getMessage());
+        }
     }
 
     /**
