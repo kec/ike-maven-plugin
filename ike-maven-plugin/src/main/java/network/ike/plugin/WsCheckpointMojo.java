@@ -2,6 +2,8 @@ package network.ike.plugin;
 
 import network.ike.workspace.Component;
 import network.ike.workspace.WorkspaceGraph;
+import network.ike.plugin.vcs.VcsOperations;
+import network.ike.plugin.vcs.VcsState;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -80,6 +82,9 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
 
         WorkspaceGraph graph = loadGraph();
         File root = workspaceRoot();
+
+        // VCS bridge: catch-up before checkpoint
+        VcsOperations.catchUp(root, getLog());
 
         String timestamp = ISO_UTC.format(Instant.now());
         String author = resolveAuthor(root);
@@ -189,6 +194,18 @@ public class WsCheckpointMojo extends AbstractWorkspaceMojo {
         } catch (IOException e) {
             throw new MojoExecutionException(
                     "Failed to write " + checkpointFile, e);
+        }
+
+        // VCS bridge: write state file after checkpoint
+        for (var entry : graph.manifest().components().entrySet()) {
+            File compDir = new File(root, entry.getKey());
+            if (new File(compDir, ".git").exists()
+                    && VcsState.isIkeManaged(compDir.toPath())) {
+                VcsOperations.writeVcsState(compDir, VcsState.ACTION_CHECKPOINT);
+            }
+        }
+        if (VcsState.isIkeManaged(root.toPath())) {
+            VcsOperations.writeVcsState(root, VcsState.ACTION_CHECKPOINT);
         }
 
         getLog().info("");

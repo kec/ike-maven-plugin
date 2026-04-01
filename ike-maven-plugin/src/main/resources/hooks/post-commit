@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# IKE VCS Bridge: post-commit hook
+# Writes state file after every commit, then auto-pushes.
+
+# Not an IKE-managed repo — pass through
+[ ! -d ".ike" ] && exit 0
+
+BRANCH=$(git branch --show-current)
+SHA=$(git rev-parse --short=8 HEAD)
+MACHINE=${HOSTNAME%%.*}
+TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+cat > .ike/vcs-state << EOF
+timestamp=$TIMESTAMP
+machine=$MACHINE
+branch=$BRANCH
+sha=$SHA
+action=commit
+EOF
+
+# Auto-push: ensures remote has commit objects for ike:sync on other machine.
+# Failure is silent — ike:verify on the other machine diagnoses the gap.
+git push origin "$BRANCH" --quiet 2>/dev/null || true

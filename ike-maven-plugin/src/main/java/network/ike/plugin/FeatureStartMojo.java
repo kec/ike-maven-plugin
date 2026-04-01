@@ -4,6 +4,8 @@ import network.ike.workspace.Component;
 import network.ike.workspace.ManifestWriter;
 import network.ike.workspace.VersionSupport;
 import network.ike.workspace.WorkspaceGraph;
+import network.ike.plugin.vcs.VcsOperations;
+import network.ike.plugin.vcs.VcsState;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
@@ -86,9 +88,12 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
             return;
         }
 
-        // --- Workspace mode (existing logic + workspace.yaml update) ---
+        // --- Workspace mode ---
         WorkspaceGraph graph = loadGraph();
         File root = workspaceRoot();
+
+        // VCS bridge: catch-up before branching
+        VcsOperations.catchUp(root, getLog());
 
         Set<String> targets;
         if (group != null && !group.isEmpty()) {
@@ -175,9 +180,22 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
             created.add(name);
         }
 
-        // Update workspace.yaml branch fields for created components
+        // Auto-push each branched component with IKE_VCS_CONTEXT
         if (!created.isEmpty() && !dryRun) {
-            updateWorkspaceYamlBranches(created, branchName);
+            for (String name : created) {
+                File dir = new File(root, name);
+                try {
+                    VcsOperations.pushWithUpstream(dir, getLog(), "origin", branchName);
+                    VcsOperations.writeVcsState(dir, VcsState.ACTION_FEATURE_START);
+                } catch (MojoExecutionException e) {
+                    getLog().warn("  Could not push " + name + ": " + e.getMessage());
+                }
+            }
+        }
+
+        // Branch the workspace repo and update workspace.yaml on the feature branch
+        if (!created.isEmpty() && !dryRun) {
+            branchWorkspaceRepo(branchName, created);
         }
 
         getLog().info("");
@@ -203,6 +221,9 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
             getLog().info("  Mode:    DRY RUN");
         }
         getLog().info("");
+
+        // VCS bridge: catch-up before branching
+        VcsOperations.catchUp(dir, getLog());
 
         // Validate clean worktree
         String status = gitStatus(dir);
@@ -262,35 +283,50 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
                     "feature: set version " + newVersion + " for " + branchName);
         }
 
+        // Auto-push and write state file
+        try {
+            VcsOperations.pushWithUpstream(dir, getLog(), "origin", branchName);
+        } catch (MojoExecutionException e) {
+            getLog().warn("  Could not push: " + e.getMessage());
+        }
+        VcsOperations.writeVcsState(dir, VcsState.ACTION_FEATURE_START);
+
         getLog().info("");
     }
 
     /**
-     * Update workspace.yaml branch fields for components that were branched,
-     * then commit the change to the workspace repo.
+     * Branch the workspace repo, update workspace.yaml on the feature branch,
+     * and push with IKE_VCS_CONTEXT.
      */
-    private void updateWorkspaceYamlBranches(List<String> components, String branchName)
+    private void branchWorkspaceRepo(String branchName, List<String> components)
             throws MojoExecutionException {
         try {
             Path manifestPath = resolveManifest();
+            File wsRoot = manifestPath.getParent().toFile();
+            File wsGit = new File(wsRoot, ".git");
+            if (!wsGit.exists()) return;
+
+            // Branch the workspace repo
+            getLog().info("  Branching workspace repo → " + branchName);
+            VcsOperations.checkoutNew(wsRoot, getLog(), branchName);
+
+            // Update workspace.yaml on the feature branch
             Map<String, String> updates = new LinkedHashMap<>();
             for (String name : components) {
                 updates.put(name, branchName);
             }
             ManifestWriter.updateBranches(manifestPath, updates);
-            getLog().info("  Updated workspace.yaml branches for " + components.size() + " components");
+            getLog().info("  Updated workspace.yaml branches for "
+                    + components.size() + " components");
 
-            // Commit the workspace.yaml change in the workspace repo
-            File wsRoot = manifestPath.getParent().toFile();
-            File wsGit = new File(wsRoot, ".git");
-            if (wsGit.exists()) {
-                ReleaseSupport.exec(wsRoot, getLog(),
-                        "git", "add", "workspace.yaml");
-                ReleaseSupport.exec(wsRoot, getLog(),
-                        "git", "commit", "-m",
-                        "workspace: update branches for feature/" + feature);
-                getLog().info("  Committed workspace.yaml update");
-            }
+            ReleaseSupport.exec(wsRoot, getLog(), "git", "add", "workspace.yaml");
+            VcsOperations.commit(wsRoot, getLog(),
+                    "workspace: update branches for " + branchName);
+
+            // Push ws feature branch
+            VcsOperations.pushWithUpstream(wsRoot, getLog(), "origin", branchName);
+            VcsOperations.writeVcsState(wsRoot, VcsState.ACTION_FEATURE_START);
+
         } catch (IOException e) {
             getLog().warn("  Could not update workspace.yaml: " + e.getMessage());
         }

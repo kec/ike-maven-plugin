@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# IKE VCS Bridge: pre-commit hook
+# Blocks commits when git state is behind Syncthing-delivered state.
+# Never mutates state. Developer runs 'mvnw ike:sync' to reconcile.
+
+STATE_FILE=".ike/vcs-state"
+
+# Not an IKE-managed repo — pass through
+[ ! -d ".ike" ] && exit 0
+
+# No state file yet — first commit or no Syncthing delivery, allow it
+[ ! -f "$STATE_FILE" ] && exit 0
+
+# Plugin-initiated commits bypass the check
+[ "$IKE_VCS_CONTEXT" = "ike-maven-plugin" ] && exit 0
+
+# Explicit developer override
+[ "$IKE_VCS_OVERRIDE" = "1" ] && exit 0
+
+# Compare state file SHA to local HEAD
+state_sha=$(grep '^sha=' "$STATE_FILE" | cut -d= -f2)
+local_sha=$(git rev-parse --short=8 HEAD 2>/dev/null)
+
+if [ -n "$state_sha" ] && [ "$state_sha" != "$local_sha" ]; then
+    state_machine=$(grep '^machine=' "$STATE_FILE" | cut -d= -f2)
+    state_time=$(grep '^timestamp=' "$STATE_FILE" | cut -d= -f2)
+    state_action=$(grep '^action=' "$STATE_FILE" | cut -d= -f2)
+    state_branch=$(grep '^branch=' "$STATE_FILE" | cut -d= -f2)
+    current_branch=$(git branch --show-current)
+    echo ""
+    echo "  ✗ Commit blocked: git state is behind Syncthing."
+    echo ""
+    echo "  Action '$state_action' was performed on '$state_machine' at $state_time"
+    echo ""
+    if [ "$state_branch" != "$current_branch" ]; then
+        echo "  Branch mismatch: you are on '$current_branch', state file says '$state_branch'"
+        echo ""
+    fi
+    echo "  Local HEAD:      $local_sha"
+    echo "  State file SHA:  $state_sha"
+    echo ""
+    echo "  Run:  mvnw ike:verify    (see full details)"
+    echo "        mvnw ike:sync      (reconcile, then retry commit)"
+    echo ""
+    exit 1
+fi

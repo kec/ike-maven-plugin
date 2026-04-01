@@ -11,11 +11,10 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration tests for {@link FeatureFinishMojo} using real temp workspaces.
+ * Integration tests for feature-finish goals using real temp workspaces.
  *
- * <p>Each test creates a fresh workspace via {@link TestWorkspaceHelper},
- * simulates a feature-start state (branch creation + version qualification),
- * then exercises the feature-finish workflow and verifies merge state.
+ * <p>Tests squash-merge (default strategy) and no-ff merge across
+ * workspace components.
  */
 class FeatureFinishIntegrationTest {
 
@@ -32,31 +31,29 @@ class FeatureFinishIntegrationTest {
         helper = new TestWorkspaceHelper(tempDir);
         helper.buildWorkspace();
 
-        // Simulate feature-start: create branch and qualify version in each component
         for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
             Path compDir = tempDir.resolve(name);
 
-            // Create feature branch
             exec(compDir, "git", "checkout", "-b", BRANCH_NAME);
 
-            // Read current POM and add branch qualifier to version
             Path pom = compDir.resolve("pom.xml");
             String pomContent = Files.readString(pom, StandardCharsets.UTF_8);
-            // Replace e.g. 1.0.0-SNAPSHOT with 1.0.0-test-finish-SNAPSHOT
             String qualified = pomContent.replaceFirst(
                     "<version>(\\d+\\.\\d+\\.\\d+)-SNAPSHOT</version>",
                     "<version>$1-test-finish-SNAPSHOT</version>");
             Files.writeString(pom, qualified, StandardCharsets.UTF_8);
 
-            // Commit the version change
             exec(compDir, "git", "add", "pom.xml");
             exec(compDir, "git", "commit", "-m",
                     "feature: set branch-qualified version");
+
+            // Add actual feature work (beyond just version change)
+            Files.writeString(compDir.resolve("feature-work.txt"),
+                    "feature content for " + name, StandardCharsets.UTF_8);
+            exec(compDir, "git", "add", "feature-work.txt");
+            exec(compDir, "git", "commit", "-m", "feature: add feature work");
         }
 
-        // Update workspace.yaml so manifest versions match the branch-qualified POMs.
-        // FeatureFinishMojo checks component.version() from the manifest to decide
-        // whether to strip the branch qualifier.
         Path wsYaml = helper.workspaceYaml();
         String yaml = Files.readString(wsYaml, StandardCharsets.UTF_8);
         yaml = yaml.replace("version: \"1.0.0-SNAPSHOT\"",
@@ -69,73 +66,81 @@ class FeatureFinishIntegrationTest {
     }
 
     @Test
-    void featureFinish_dryRun_noMerge() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+    void squash_dryRun_noMerge() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
         mojo.manifest = helper.workspaceYaml().toFile();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.message = "Should not happen";
         mojo.dryRun = true;
 
         mojo.execute();
 
-        // Verify still on feature branch — no merge happened
         for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
             String branch = execCapture(tempDir.resolve(name),
                     "git", "rev-parse", "--abbrev-ref", "HEAD");
             assertThat(branch).isEqualTo(BRANCH_NAME);
         }
-
-        // Verify no merge tags exist
-        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
-            String tags = execCapture(tempDir.resolve(name), "git", "tag", "-l");
-            assertThat(tags).doesNotContain("merge/");
-        }
     }
 
     @Test
-    void featureFinish_mergesAndTags() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+    void squash_mergesAndStripsVersions() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
         mojo.manifest = helper.workspaceYaml().toFile();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.message = "Squash feature";
         mojo.dryRun = false;
 
         mojo.execute();
 
-        // Verify each component is on main (target branch)
         for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
             String branch = execCapture(tempDir.resolve(name),
                     "git", "rev-parse", "--abbrev-ref", "HEAD");
             assertThat(branch).isEqualTo("main");
         }
 
-        // Verify merge tags exist for each component
-        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
-            String expectedTag = "merge/" + BRANCH_NAME + "/" + name;
-            String tags = execCapture(tempDir.resolve(name),
-                    "git", "tag", "-l", expectedTag);
-            assertThat(tags.strip()).isEqualTo(expectedTag);
-        }
-
-        // Verify merge commit exists in git log (--no-ff merge)
-        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
-            String log = execCapture(tempDir.resolve(name),
-                    "git", "log", "--oneline", "-5");
-            assertThat(log).contains("Merge " + BRANCH_NAME);
-        }
-
-        // Verify version qualifier stripped from POMs (back to plain SNAPSHOT)
+        // Versions stripped
         for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
             String pomContent = Files.readString(
                     tempDir.resolve(name).resolve("pom.xml"), StandardCharsets.UTF_8);
             assertThat(pomContent).doesNotContain("test-finish");
             assertThat(pomContent).contains("SNAPSHOT");
         }
+
+        // Squash commits present (no "Merge" commits)
+        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
+            String log = execCapture(tempDir.resolve(name),
+                    "git", "log", "--oneline", "-3");
+            assertThat(log).contains("Squash feature");
+        }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────
+    @Test
+    void merge_preservesHistory() throws Exception {
+        FeatureFinishMergeMojo mojo = new FeatureFinishMergeMojo();
+        mojo.manifest = helper.workspaceYaml().toFile();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
+            String branch = execCapture(tempDir.resolve(name),
+                    "git", "rev-parse", "--abbrev-ref", "HEAD");
+            assertThat(branch).isEqualTo("main");
+        }
+
+        // Merge commits present
+        for (String name : new String[]{"lib-a", "lib-b", "app-c"}) {
+            String log = execCapture(tempDir.resolve(name),
+                    "git", "log", "--oneline", "-5");
+            assertThat(log).contains("Merge " + BRANCH_NAME);
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────
 
     private void exec(Path workDir, String... command) throws Exception {
         Process process = new ProcessBuilder(command)

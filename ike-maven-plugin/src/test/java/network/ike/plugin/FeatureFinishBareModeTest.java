@@ -14,11 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Integration tests for {@link FeatureFinishMojo} bare-mode (no workspace.yaml).
+ * Integration tests for feature-finish bare-mode (no workspace.yaml).
  *
- * <p>Each test creates a standalone git repo, simulates a feature-start
- * state (feature branch with branch-qualified version), then exercises
- * the bare-mode feature-finish workflow.
+ * <p>Tests all three strategies: squash, merge, and rebase.
  */
 class FeatureFinishBareModeTest {
 
@@ -34,7 +32,6 @@ class FeatureFinishBareModeTest {
     void setUp() throws Exception {
         originalUserDir = System.getProperty("user.dir");
 
-        // Create a standalone git repo on main with pom.xml
         Files.writeString(tempDir.resolve("pom.xml"), """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <project xmlns="http://maven.apache.org/POM/4.0.0">
@@ -51,10 +48,8 @@ class FeatureFinishBareModeTest {
         exec(tempDir, "git", "add", ".");
         exec(tempDir, "git", "commit", "-m", "Initial commit");
 
-        // Create feature branch with branch-qualified version
         exec(tempDir, "git", "checkout", "-b", BRANCH_NAME);
 
-        // Qualify the version to simulate feature-start
         Path pom = tempDir.resolve("pom.xml");
         String pomContent = Files.readString(pom, StandardCharsets.UTF_8);
         String qualified = pomContent.replace(
@@ -63,8 +58,13 @@ class FeatureFinishBareModeTest {
         Files.writeString(pom, qualified, StandardCharsets.UTF_8);
 
         exec(tempDir, "git", "add", "pom.xml");
-        exec(tempDir, "git", "commit", "-m",
-                "feature: set branch-qualified version");
+        exec(tempDir, "git", "commit", "-m", "feature: set branch-qualified version");
+
+        // Add a real code change on the feature branch (beyond just version)
+        Files.writeString(tempDir.resolve("feature-work.txt"),
+                "actual feature content", StandardCharsets.UTF_8);
+        exec(tempDir, "git", "add", "feature-work.txt");
+        exec(tempDir, "git", "commit", "-m", "feature: add feature work");
 
         System.setProperty("user.dir", tempDir.toAbsolutePath().toString());
     }
@@ -74,92 +74,64 @@ class FeatureFinishBareModeTest {
         System.setProperty("user.dir", originalUserDir);
     }
 
+    // ── Squash strategy tests ────────────────────────────────────
+
     @Test
-    void bareMode_mergesFeatureToMain() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+    void squash_mergesAndStripsVersion() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.message = "Squash: add test feature";
         mojo.dryRun = false;
 
         mojo.execute();
 
-        // Verify on main branch
-        String branch = execCapture(tempDir,
-                "git", "rev-parse", "--abbrev-ref", "HEAD");
-        assertThat(branch).isEqualTo("main");
+        assertThat(currentBranch()).isEqualTo("main");
 
-        // Verify merge commit exists
-        String log = execCapture(tempDir,
-                "git", "log", "--oneline", "-5");
-        assertThat(log).contains("Merge " + BRANCH_NAME);
-
-        // Verify version stripped back to plain SNAPSHOT
-        String pomContent = Files.readString(
-                tempDir.resolve("pom.xml"), StandardCharsets.UTF_8);
+        // Version stripped back to plain SNAPSHOT
+        String pomContent = Files.readString(tempDir.resolve("pom.xml"), StandardCharsets.UTF_8);
         assertThat(pomContent).doesNotContain("test-finish");
         assertThat(pomContent).contains("3.0.0-SNAPSHOT");
+
+        // Squash commit message present (not a merge commit)
+        String log = execCapture(tempDir, "git", "log", "--oneline", "-3");
+        assertThat(log).contains("Squash: add test feature");
+        assertThat(log).doesNotContain("Merge ");
     }
 
     @Test
-    void bareMode_dryRun_staysOnFeatureBranch() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+    void squash_deletesBranchByDefault() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
-        mojo.dryRun = true;
-
-        mojo.execute();
-
-        // Verify still on feature branch
-        String branch = execCapture(tempDir,
-                "git", "rev-parse", "--abbrev-ref", "HEAD");
-        assertThat(branch).isEqualTo(BRANCH_NAME);
-
-        // Verify POM still has branch-qualified version
-        String pomContent = Files.readString(
-                tempDir.resolve("pom.xml"), StandardCharsets.UTF_8);
-        assertThat(pomContent).contains("test-finish");
-    }
-
-    @Test
-    void bareMode_wrongBranch_fails() throws Exception {
-        // Checkout main so we're NOT on the feature branch
-        exec(tempDir, "git", "checkout", "main");
-
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
-        mojo.feature = FEATURE_NAME;
-        mojo.targetBranch = "main";
-        mojo.push = false;
-        mojo.dryRun = false;
-
-        assertThatThrownBy(mojo::execute)
-                .isInstanceOf(MojoExecutionException.class)
-                .hasMessageContaining("Not on " + BRANCH_NAME);
-    }
-
-    @Test
-    void bareMode_tagCreated() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
-        mojo.feature = FEATURE_NAME;
-        mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.message = "Squash merge";
         mojo.dryRun = false;
 
         mojo.execute();
 
-        // Verify merge tag exists — format: merge/feature/<name>/<dir-name>
-        String dirName = tempDir.getFileName().toString();
-        String expectedTag = "merge/" + BRANCH_NAME + "/" + dirName;
-        String tags = execCapture(tempDir,
-                "git", "tag", "-l", "merge/*");
-        assertThat(tags).contains(expectedTag);
+        // Feature branch should be deleted
+        String branches = execCapture(tempDir, "git", "branch");
+        assertThat(branches).doesNotContain("feature/test-finish");
     }
 
     @Test
-    void bareMode_multiModuleProject_stripsSubmoduleVersions() throws Exception {
-        // Add a submodule with the branch-qualified version
-        // (we're already on feature/test-finish from setUp)
+    void squash_keepBranch_preservesBranch() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.message = "Squash merge";
+        mojo.keepBranch = true;
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        // Feature branch should still exist
+        String branches = execCapture(tempDir, "git", "branch");
+        assertThat(branches).contains("feature/test-finish");
+    }
+
+    @Test
+    void squash_multiModule_stripsSubmoduleVersions() throws Exception {
         Path subDir = tempDir.resolve("sub-module");
         Files.createDirectories(subDir);
         Files.writeString(subDir.resolve("pom.xml"), """
@@ -175,55 +147,142 @@ class FeatureFinishBareModeTest {
                 """, StandardCharsets.UTF_8);
 
         exec(tempDir, "git", "add", ".");
-        exec(tempDir, "git", "commit", "-m", "Add submodule with qualified version");
+        exec(tempDir, "git", "commit", "-m", "Add submodule");
 
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.message = "Squash with submodules";
         mojo.dryRun = false;
 
         mojo.execute();
 
-        // Verify on main branch
-        String branch = execCapture(tempDir,
-                "git", "rev-parse", "--abbrev-ref", "HEAD");
-        assertThat(branch).isEqualTo("main");
+        assertThat(currentBranch()).isEqualTo("main");
 
-        // Root POM version should be stripped back to plain SNAPSHOT
-        Path pom = tempDir.resolve("pom.xml");
-        String rootPomContent = Files.readString(pom, StandardCharsets.UTF_8);
-        assertThat(rootPomContent).doesNotContain("test-finish");
-        assertThat(rootPomContent).contains("3.0.0-SNAPSHOT");
+        // Root POM stripped
+        String rootPom = Files.readString(tempDir.resolve("pom.xml"), StandardCharsets.UTF_8);
+        assertThat(rootPom).doesNotContain("test-finish");
+        assertThat(rootPom).contains("3.0.0-SNAPSHOT");
 
-        // Submodule parent version should also be stripped
-        Path subPom = subDir.resolve("pom.xml");
-        String subPomContent = Files.readString(subPom, StandardCharsets.UTF_8);
-        assertThat(subPomContent).doesNotContain("test-finish");
-        assertThat(subPomContent).contains("3.0.0-SNAPSHOT");
+        // Submodule parent version stripped
+        String subPom = Files.readString(subDir.resolve("pom.xml"), StandardCharsets.UTF_8);
+        assertThat(subPom).doesNotContain("test-finish");
+        assertThat(subPom).contains("3.0.0-SNAPSHOT");
+    }
+
+    // ── Merge strategy tests ─────────────────────────────────────
+
+    @Test
+    void merge_createsMergeCommit() throws Exception {
+        FeatureFinishMergeMojo mojo = new FeatureFinishMergeMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        assertThat(currentBranch()).isEqualTo("main");
+
+        // Merge commit present
+        String log = execCapture(tempDir, "git", "log", "--oneline", "-5");
+        assertThat(log).contains("Merge " + BRANCH_NAME);
     }
 
     @Test
-    void bareMode_dryRun_logsVersionInfo() throws Exception {
-        FeatureFinishMojo mojo = new FeatureFinishMojo();
+    void merge_keepsBranchByDefault() throws Exception {
+        FeatureFinishMergeMojo mojo = new FeatureFinishMergeMojo();
         mojo.feature = FEATURE_NAME;
         mojo.targetBranch = "main";
-        mojo.push = false;
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        // Branch kept by default for merge strategy
+        String branches = execCapture(tempDir, "git", "branch");
+        assertThat(branches).contains("feature/test-finish");
+    }
+
+    // ── Rebase strategy tests ────────────────────────────────────
+
+    @Test
+    void rebase_producesLinearHistory() throws Exception {
+        FeatureFinishRebaseMojo mojo = new FeatureFinishRebaseMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        assertThat(currentBranch()).isEqualTo("main");
+
+        // No merge commits — linear history
+        String log = execCapture(tempDir, "git", "log", "--oneline", "-5");
+        assertThat(log).doesNotContain("Merge ");
+    }
+
+    // ── Common tests ─────────────────────────────────────────────
+
+    @Test
+    void dryRun_staysOnFeatureBranch() throws Exception {
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.message = "Should not happen";
         mojo.dryRun = true;
 
         mojo.execute();
 
-        // Verify still on feature branch (dry run makes no changes)
-        String branch = execCapture(tempDir,
-                "git", "rev-parse", "--abbrev-ref", "HEAD");
-        assertThat(branch).isEqualTo(BRANCH_NAME);
-
-        // Verify no merge tag was created
-        String tags = execCapture(tempDir, "git", "tag", "-l");
-        assertThat(tags).isEmpty();
+        assertThat(currentBranch()).isEqualTo(BRANCH_NAME);
+        String pomContent = Files.readString(tempDir.resolve("pom.xml"), StandardCharsets.UTF_8);
+        assertThat(pomContent).contains("test-finish");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────
+    @Test
+    void wrongBranch_fails() throws Exception {
+        exec(tempDir, "git", "checkout", "main");
+
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.message = "Should fail";
+        mojo.dryRun = false;
+
+        assertThatThrownBy(mojo::execute)
+                .isInstanceOf(MojoExecutionException.class)
+                .hasMessageContaining("Not on " + BRANCH_NAME);
+    }
+
+    // ── VCS state file tests ─────────────────────────────────────
+
+    @Test
+    void squash_writesVcsState() throws Exception {
+        // Create .ike directory to enable VCS state
+        Files.createDirectories(tempDir.resolve(".ike"));
+        Files.writeString(tempDir.resolve(".ike/.gitkeep"), "", StandardCharsets.UTF_8);
+        exec(tempDir, "git", "add", ".ike");
+        exec(tempDir, "git", "commit", "-m", "Add .ike marker");
+
+        FeatureFinishSquashMojo mojo = new FeatureFinishSquashMojo();
+        mojo.feature = FEATURE_NAME;
+        mojo.targetBranch = "main";
+        mojo.message = "Squash with state";
+        mojo.dryRun = false;
+
+        mojo.execute();
+
+        // VCS state file should exist with feature-finish action
+        Path stateFile = tempDir.resolve(".ike/vcs-state");
+        assertThat(stateFile).exists();
+        String content = Files.readString(stateFile, StandardCharsets.UTF_8);
+        assertThat(content).contains("action=feature-finish");
+        assertThat(content).contains("branch=main");
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────
+
+    private String currentBranch() throws Exception {
+        return execCapture(tempDir, "git", "rev-parse", "--abbrev-ref", "HEAD");
+    }
 
     private void exec(Path workDir, String... command) throws Exception {
         Process process = new ProcessBuilder(command)

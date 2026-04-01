@@ -1,5 +1,7 @@
 package network.ike.plugin;
 
+import network.ike.plugin.vcs.VcsOperations;
+import network.ike.plugin.vcs.VcsState;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -75,6 +77,9 @@ public class ReleaseMojo extends AbstractMojo {
     public void execute() throws MojoExecutionException {
         File startDir = baseDir != null ? baseDir : new File(".");
         File gitRoot = ReleaseSupport.gitRoot(startDir);
+
+        // VCS bridge: catch-up before release
+        VcsOperations.catchUp(gitRoot, getLog());
         File mvnw = ReleaseSupport.resolveMavenWrapper(gitRoot, getLog());
         File rootPom = new File(gitRoot, "pom.xml");
 
@@ -372,6 +377,9 @@ public class ReleaseMojo extends AbstractMojo {
                         + e.getMessage());
             }
         }
+
+        // VCS bridge: write state file after release
+        VcsOperations.writeVcsState(gitRoot, VcsState.ACTION_RELEASE);
 
         getLog().info("");
         getLog().info("Release " + releaseVersion + " complete.");

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# IKE VCS Bridge: pre-push hook
+# Blocks creation of new branches and tags unless through ike plugin.
+# Pushes to existing branches are always allowed.
+
+# Not an IKE-managed repo — pass through
+[ ! -d ".ike" ] && exit 0
+
+# Plugin-initiated pushes bypass the check
+[ "$IKE_VCS_CONTEXT" = "ike-maven-plugin" ] && exit 0
+
+# Explicit developer override
+[ "$IKE_VCS_OVERRIDE" = "1" ] && exit 0
+
+# Check each ref being pushed
+while read local_ref local_sha remote_ref remote_sha; do
+    # 40 zeros = new ref being created on remote
+    if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+        echo ""
+        echo "  ✗ Push blocked: creating new remote ref '$remote_ref'"
+        echo ""
+        echo "  New branches: mvnw ike:feature-start -Dfeature=<name>"
+        echo "  New tags:     mvnw ike:release or mvnw ike:ws-checkpoint"
+        echo ""
+        echo "  Override:     IKE_VCS_OVERRIDE=1 git push ..."
+        echo ""
+        exit 1
+    fi
+done
+
+# Existing branch/tag push — update state file action to "push"
+if [ -d ".ike" ] && [ -f ".ike/vcs-state" ]; then
+    BRANCH=$(git branch --show-current)
+    SHA=$(git rev-parse --short=8 HEAD)
+    MACHINE=${HOSTNAME%%.*}
+    TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    cat > .ike/vcs-state << EOF
+timestamp=$TIMESTAMP
+machine=$MACHINE
+branch=$BRANCH
+sha=$SHA
+action=push
+EOF
+fi
