@@ -33,6 +33,9 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  ike:check-branch                                Warn on direct branching (git hook)");
         getLog().info("  ike:ws-sync                                     Sync workspace.yaml ↔ actual branches");
         getLog().info("");
+        getLog().info("  ── Editor Goals ─────────────────────────────────────────");
+        getLog().info("  ike:adocstudio                                  Generate Adoc Studio sidecar projects (macOS)");
+        getLog().info("");
         getLog().info("  ── VCS Bridge Goals ─────────────────────────────────────");
         getLog().info("  ike:setup                                       Install VCS bridge hooks to ~/.git-hooks/");
         getLog().info("  ike:sync                                        Reconcile git state after machine switch");
@@ -55,6 +58,10 @@ public class IkeHelpMojo extends AbstractMojo {
         getLog().info("  ike:generate-bom                                Auto-generate BOM from ike-parent");
         getLog().info("  ike:deploy-site                                 Deploy site to versioned URL");
         getLog().info("  ike:clean-site                                  Remove a deployed site from the server");
+        getLog().info("");
+        getLog().info("Options for ike:adocstudio:");
+        getLog().info("  -Dadocstudio.sourceDir=<path>   Assembly root (default: current dir)");
+        getLog().info("  -Dadocstudio.outputDir=<path>   Sidecar dir (default: ~/Documents/ike-adoc-studio)");
         getLog().info("");
         getLog().info("Options for workspace goals:");
         getLog().info("  -Dworkspace.manifest=<path>  Path to workspace.yaml (auto-detected)");
