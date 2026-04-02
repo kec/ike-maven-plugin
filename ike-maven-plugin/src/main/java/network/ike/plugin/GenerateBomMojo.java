@@ -17,11 +17,26 @@ import java.util.List;
 /**
  * Generate a Bill of Materials POM from another module's dependency management.
  *
- * <p>Reads the {@code <dependencyManagement>} entries from a source module
- * (default: {@code ike-parent}) in the reactor and writes a standalone BOM
- * POM with all versions resolved to literals. The generated POM replaces
- * the stub POM for install/deploy, so external consumers get a fully
- * populated BOM without any manual maintenance.</p>
+ * <h2>Why this goal exists</h2>
+ *
+ * <p>Maven 4's consumer POM resolves property references in
+ * {@code <dependencies>} but <em>not</em> in {@code <dependencyManagement>}.
+ * When an external project imports a BOM via {@code <scope>import</scope>},
+ * it receives the consumer POM — so any {@code ${…}} expressions in managed
+ * dependency versions arrive unresolved and the build fails.
+ * {@code flatten-maven-plugin}, the Maven 3 solution for this class of
+ * problem, has not been updated for the Maven 4 model changes.</p>
+ *
+ * <p>This goal works around the limitation by reading the
+ * {@code <dependencyManagement>} entries from a source module (default:
+ * {@code ike-parent}) in the reactor, resolving every property reference to
+ * a literal value, and writing a standalone BOM POM. The generated POM
+ * replaces the stub POM for install/deploy, so external consumers get a
+ * fully populated BOM without any manual maintenance. The generated POM
+ * uses the {@code 4.0.0} model version for maximum consumer
+ * compatibility.</p>
+ *
+ * <h2>Usage</h2>
  *
  * <p>Bind this goal to a POM-packaged stub module in the reactor,
  * ordered <em>after</em> the source module and the plugin module:</p>
