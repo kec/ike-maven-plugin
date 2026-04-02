@@ -6,3 +6,4 @@ target/
 # site:stage creates directories at project root based on
 # distributionManagement site URL path structure
 ike-pipeline/
+.ike/vcs-state
