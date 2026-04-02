@@ -85,6 +85,10 @@ public class SetupMojo extends AbstractMojo {
             getLog().info("  All hooks already present.");
         }
 
+        // Ensure global gitignore entries
+        getLog().info("");
+        ensureGlobalGitignore();
+
         // Verify core.hooksPath
         getLog().info("");
         checkHooksPath(hooksDir);
@@ -118,6 +122,37 @@ public class SetupMojo extends AbstractMojo {
         } catch (IOException e) {
             getLog().warn("Could not set execute permission on " + file
                     + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Ensure standard entries exist in the global gitignore file.
+     * Creates the file if it doesn't exist.
+     */
+    private void ensureGlobalGitignore() {
+        Path globalIgnore = Path.of(System.getProperty("user.home"), ".gitignore_global");
+        try {
+            String content = Files.exists(globalIgnore)
+                    ? Files.readString(globalIgnore, StandardCharsets.UTF_8) : "";
+
+            StringBuilder additions = new StringBuilder();
+            if (!content.contains("_git-init")) {
+                additions.append("_git-init*\n");
+            }
+            if (!content.contains("vcs-state")) {
+                additions.append(".ike/vcs-state\n");
+            }
+
+            if (additions.isEmpty()) {
+                getLog().info("  Global gitignore: already current  ✓");
+                return;
+            }
+
+            String updated = content + (content.endsWith("\n") ? "" : "\n") + additions;
+            Files.writeString(globalIgnore, updated, StandardCharsets.UTF_8);
+            getLog().info("  Global gitignore: updated (" + globalIgnore + ")");
+        } catch (IOException e) {
+            getLog().warn("  Could not update global gitignore: " + e.getMessage());
         }
     }
 
