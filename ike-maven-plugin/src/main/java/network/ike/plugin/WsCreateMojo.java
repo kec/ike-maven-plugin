@@ -178,14 +178,14 @@ public class WsCreateMojo extends AbstractMojo {
         xml.append("    <packaging>pom</packaging>\n\n");
         xml.append("    <name>").append(description).append("</name>\n\n");
         xml.append("    <properties>\n");
-        xml.append("        <ike-maven-plugin.version>").append(pluginVersion).append("</ike-maven-plugin.version>\n");
+        xml.append("        <ike-tooling.version>").append(pluginVersion).append("</ike-tooling.version>\n");
         xml.append("    </properties>\n\n");
         xml.append("    <build>\n");
         xml.append("        <plugins>\n");
         xml.append("            <plugin>\n");
         xml.append("                <groupId>network.ike</groupId>\n");
         xml.append("                <artifactId>ike-maven-plugin</artifactId>\n");
-        xml.append("                <version>${ike-maven-plugin.version}</version>\n");
+        xml.append("                <version>${ike-tooling.version}</version>\n");
         xml.append("            </plugin>\n");
         xml.append("        </plugins>\n");
         xml.append("    </build>\n\n");

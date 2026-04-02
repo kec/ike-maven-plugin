@@ -32,7 +32,7 @@ import java.util.List;
  *   <li><b>pom-root-attribute</b> — ensure workspace POM has
  *       {@code root="true"} for Maven 4.1.0 reactor boundary</li>
  *   <li><b>maven-config</b> — ensure {@code .mvn/maven.config} exists</li>
- *   <li><b>plugin-version</b> — update {@code ike-maven-plugin.version}
+ *   <li><b>plugin-version</b> — update {@code ike-tooling.version}
  *       property in the workspace POM to the current plugin version</li>
  * </ul>
  *
@@ -298,14 +298,14 @@ public class WsUpgradeMojo extends AbstractWorkspaceMojo {
 
             String content = Files.readString(pom, StandardCharsets.UTF_8);
 
-            // Find current ike-maven-plugin.version property
+            // Find current ike-tooling.version property
             java.util.regex.Pattern versionProp = java.util.regex.Pattern.compile(
                     "(<ike-maven-plugin\\.version>)(.*?)(</ike-maven-plugin\\.version>)");
             java.util.regex.Matcher m = versionProp.matcher(content);
 
             if (!m.find()) {
                 skipped.add("plugin-version");
-                getLog().info("  - Plugin version: no ike-maven-plugin.version property found");
+                getLog().info("  - Plugin version: no ike-tooling.version property found");
                 return;
             }
 
