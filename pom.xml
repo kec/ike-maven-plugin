@@ -19,7 +19,7 @@
 
     <groupId>network.ike</groupId>
     <artifactId>ike-tooling</artifactId>
-    <version>47-SNAPSHOT</version>
+    <version>47</version>
     <packaging>pom</packaging>
 
     <name>IKE Tooling</name>
@@ -71,7 +71,7 @@
         <!-- Build -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-        <project.build.outputTimestamp>2026-04-01T23:31:51Z</project.build.outputTimestamp>
+        <project.build.outputTimestamp>2026-04-02T05:21:35Z</project.build.outputTimestamp>
 
         <!-- Java -->
         <java.version>25</java.version>
@@ -122,7 +122,7 @@
                 <plugin>
                     <groupId>network.ike</groupId>
                     <artifactId>ike-maven-plugin</artifactId>
-                    <version>${project.version}</version>
+                    <version>47</version>
                     <executions>
                         <execution>
                             <id>render-site-content</id>
