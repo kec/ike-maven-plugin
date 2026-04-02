@@ -297,31 +297,49 @@ public class WsUpgradeMojo extends AbstractWorkspaceMojo {
             }
 
             String content = Files.readString(pom, StandardCharsets.UTF_8);
+            boolean changed = false;
 
-            // Find current ike-tooling.version property
+            // Migration: rename ike-maven-plugin.version → ike-tooling.version
+            // Also update the ${...} reference in the plugin version element
+            if (content.contains("<ike-maven-plugin.version>")) {
+                content = content.replace(
+                        "<ike-maven-plugin.version>", "<ike-tooling.version>");
+                content = content.replace(
+                        "</ike-maven-plugin.version>", "</ike-tooling.version>");
+                content = content.replace(
+                        "${ike-maven-plugin.version}", "${ike-tooling.version}");
+                changed = true;
+                getLog().info("  ↑ Property renamed: ike-maven-plugin.version → ike-tooling.version");
+            }
+
+            // Find current ike-tooling.version property and bump
             java.util.regex.Pattern versionProp = java.util.regex.Pattern.compile(
-                    "(<ike-maven-plugin\\.version>)(.*?)(</ike-maven-plugin\\.version>)");
+                    "(<ike-tooling\\.version>)(.*?)(</ike-tooling\\.version>)");
             java.util.regex.Matcher m = versionProp.matcher(content);
 
             if (!m.find()) {
-                skipped.add("plugin-version");
-                getLog().info("  - Plugin version: no ike-tooling.version property found");
+                if (!changed) {
+                    skipped.add("plugin-version");
+                    getLog().info("  - Plugin version: no ike-tooling.version property found");
+                }
                 return;
             }
 
             String currentVersion = m.group(2);
-            if (currentVersion.equals(pluginVersion)) {
+            if (!currentVersion.equals(pluginVersion)) {
+                content = m.replaceFirst("$1" + pluginVersion + "$3");
+                changed = true;
+                getLog().info("  ↑ Plugin version: " + currentVersion + " → " + pluginVersion);
+            } else if (!changed) {
                 skipped.add("plugin-version");
                 getLog().info("  ✓ Plugin version: already " + pluginVersion);
                 return;
             }
 
-            if (!dryRun) {
-                String updated = m.replaceFirst("$1" + pluginVersion + "$3");
-                Files.writeString(pom, updated, StandardCharsets.UTF_8);
+            if (!dryRun && changed) {
+                Files.writeString(pom, content, StandardCharsets.UTF_8);
             }
             applied.add("plugin-version");
-            getLog().info("  ↑ Plugin version: " + currentVersion + " → " + pluginVersion);
         } catch (IOException e) {
             getLog().warn("  ⚠ Could not update plugin version: " + e.getMessage());
         }
