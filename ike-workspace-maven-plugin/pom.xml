@@ -73,19 +73,19 @@
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-maven-plugin</artifactId>
-            <version>54</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Workspace model library -->
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-workspace-model</artifactId>
-            <version>54</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Claude instruction files (unpacked at validate phase) -->
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-build-standards</artifactId>
-            <version>54</version>
+            <version>${project.version}</version>
             <classifier>claude</classifier>
             <type>zip</type>
             <scope>provided</scope>

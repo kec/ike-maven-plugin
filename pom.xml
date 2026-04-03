@@ -146,7 +146,7 @@
                 <plugin>
                     <groupId>network.ike</groupId>
                     <artifactId>ike-maven-plugin</artifactId>
-                    <version>54</version>
+                    <version>${project.version}</version>
                     <executions>
                         <execution>
                             <id>render-site-content</id>
