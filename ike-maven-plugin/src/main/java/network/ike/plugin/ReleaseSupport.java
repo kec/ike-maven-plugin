@@ -380,6 +380,25 @@ class ReleaseSupport {
         return (Integer.parseInt(base) + 1) + "-SNAPSHOT";
     }
 
+    /**
+     * Update a named Maven property in POM content.
+     * Replaces {@code <propertyName>oldValue</propertyName>} with
+     * {@code <propertyName>newVersion</propertyName>}.
+     *
+     * @param pomContent   the POM file content as a string
+     * @param propertyName the Maven property name (e.g., "ike-bom.version")
+     * @param newVersion   the new version value
+     * @return the updated POM content (unchanged if property not found)
+     */
+    static String updateVersionProperty(String pomContent,
+                                         String propertyName,
+                                         String newVersion) {
+        String propPattern = "<" + java.util.regex.Pattern.quote(propertyName)
+                + ">[^<]+</" + java.util.regex.Pattern.quote(propertyName) + ">";
+        return pomContent.replaceAll(propPattern,
+                "<" + propertyName + ">" + newVersion + "</" + propertyName + ">");
+    }
+
     private static final String PROJECT_VERSION_EXPR = "${project.version}";
     private static final String BACKUP_SUFFIX = ".ike-backup";
 

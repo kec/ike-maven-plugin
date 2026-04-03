@@ -360,24 +360,12 @@ public class WsReleaseMojo extends AbstractWorkspaceMojo {
     }
 
     /**
-     * Update a version property element in POM content.
-     *
-     * <p>Replaces {@code <propertyName>old</propertyName>} with
-     * {@code <propertyName>newVersion</propertyName>} for all
-     * occurrences.
-     *
-     * @param pomContent   raw POM XML as a string
-     * @param propertyName the property element name (e.g., "ike-pipeline.version")
-     * @param newVersion   the new version value
-     * @return the updated POM content (unchanged if no match)
+     * Delegate to shared utility in {@link ReleaseSupport}.
      */
     public static String updateVersionProperty(String pomContent,
                                                 String propertyName,
                                                 String newVersion) {
-        String propPattern = "<" + java.util.regex.Pattern.quote(propertyName)
-                + ">[^<]+</" + java.util.regex.Pattern.quote(propertyName) + ">";
-        return pomContent.replaceAll(propPattern,
-                "<" + propertyName + ">" + newVersion + "</" + propertyName + ">");
+        return ReleaseSupport.updateVersionProperty(pomContent, propertyName, newVersion);
     }
 
     // ── Helper: version bump ─────────────────────────────────────────

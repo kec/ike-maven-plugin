@@ -180,6 +180,11 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
             created.add(name);
         }
 
+        // Cascade version-property updates to downstream components
+        if (!created.isEmpty() && !dryRun && !skipVersion) {
+            cascadeVersionProperties(graph, root, sorted, branchName);
+        }
+
         // Auto-push each branched component with IKE_VCS_CONTEXT
         if (!created.isEmpty() && !dryRun) {
             for (String name : created) {
@@ -373,6 +378,80 @@ public class FeatureStartMojo extends AbstractWorkspaceMojo {
             }
         } catch (MojoExecutionException e) {
             getLog().warn("    Could not scan for submodule POMs: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Cascade version-property updates to downstream components.
+     *
+     * <p>When an upstream component's version changes (e.g., tinkar-core
+     * gets a branch-qualified version), downstream components that track
+     * that version via a POM property (declared as {@code version-property}
+     * in workspace.yaml) need their property updated too.
+     *
+     * <p>For example, if rocks-kb depends on tinkar-core with
+     * {@code version-property: ike-bom.version}, and tinkar-core's version
+     * changed to {@code 1.127.2-feature-foo-SNAPSHOT}, then rocks-kb's
+     * {@code <ike-bom.version>} property is updated to match.
+     */
+    private void cascadeVersionProperties(WorkspaceGraph graph, File root,
+                                           List<String> sorted, String branchName)
+            throws MojoExecutionException {
+
+        // Build map of upstream component → new branch-qualified version
+        java.util.Map<String, String> newVersions = new java.util.LinkedHashMap<>();
+        for (String name : sorted) {
+            Component comp = graph.manifest().components().get(name);
+            if (comp.version() != null && !comp.version().isEmpty()) {
+                newVersions.put(name, VersionSupport.branchQualifiedVersion(
+                        comp.version(), branchName));
+            }
+        }
+
+        // For each component in topological order, update version-properties
+        // that reference upstream components
+        for (String name : sorted) {
+            Component comp = graph.manifest().components().get(name);
+            File dir = new File(root, name);
+            File pomFile = new File(dir, "pom.xml");
+            if (!pomFile.exists()) continue;
+
+            boolean pomChanged = false;
+            try {
+                String content = java.nio.file.Files.readString(
+                        pomFile.toPath(), java.nio.charset.StandardCharsets.UTF_8);
+                String original = content;
+
+                for (network.ike.workspace.Dependency dep : comp.dependsOn()) {
+                    String upstreamName = dep.component();
+                    if (dep.versionProperty() == null) continue;
+                    if (!newVersions.containsKey(upstreamName)) continue;
+
+                    String upstreamVersion = newVersions.get(upstreamName);
+                    String before = content;
+                    content = ReleaseSupport.updateVersionProperty(
+                            content, dep.versionProperty(), upstreamVersion);
+
+                    if (!content.equals(before)) {
+                        getLog().info("    " + name + ": " + dep.versionProperty()
+                                + " → " + upstreamVersion
+                                + " (from " + upstreamName + ")");
+                    }
+                }
+
+                if (!content.equals(original)) {
+                    java.nio.file.Files.writeString(
+                            pomFile.toPath(), content,
+                            java.nio.charset.StandardCharsets.UTF_8);
+                    ReleaseSupport.exec(dir, getLog(), "git", "add", "pom.xml");
+                    ReleaseSupport.exec(dir, getLog(), "git", "commit", "-m",
+                            "feature: update dependency versions for " + branchName);
+                    pomChanged = true;
+                }
+            } catch (java.io.IOException e) {
+                getLog().warn("    Could not cascade version properties in "
+                        + name + ": " + e.getMessage());
+            }
         }
     }
 }
