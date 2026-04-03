@@ -113,12 +113,14 @@ public class WsCreateMojo extends AbstractMojo {
             writeFile(wsDir.resolve(".gitignore"), generateGitignore());
             writeFile(wsDir.resolve(".mvn/maven.config"), "-T 1C\n");
             writeFile(wsDir.resolve("README.adoc"), generateReadme());
+            installMavenWrapper(wsDir);
 
             getLog().info("  ✓ pom.xml");
             getLog().info("  ✓ workspace.yaml");
             getLog().info("  ✓ .gitignore");
             getLog().info("  ✓ .mvn/maven.config");
             getLog().info("  ✓ README.adoc");
+            getLog().info("  ✓ mvnw (Maven " + mavenVersion + ")");
 
         } catch (IOException e) {
             throw new MojoExecutionException(
@@ -241,7 +243,9 @@ public class WsCreateMojo extends AbstractMojo {
         gi.append("!.gitignore\n");
         gi.append("!pom.xml\n");
         gi.append("!workspace.yaml\n");
-        gi.append("!README.adoc\n\n");
+        gi.append("!README.adoc\n");
+        gi.append("!mvnw\n");
+        gi.append("!mvnw.cmd\n\n");
         gi.append("# ── Whitelist workspace-owned directories ────────────────────────\n");
         gi.append("!.mvn/\n");
         gi.append("!.mvn/**\n");
@@ -298,6 +302,96 @@ public class WsCreateMojo extends AbstractMojo {
                     "git", "remote", "add", "origin", remoteUrl);
             getLog().info("  ✓ remote: " + remoteUrl);
         }
+    }
+
+    /**
+     * Install Maven wrapper (mvnw, mvnw.cmd, .mvn/wrapper/maven-wrapper.properties)
+     * at the workspace root so the aggregator POM resolves the correct Maven version.
+     */
+    private void installMavenWrapper(Path wsDir) throws IOException {
+        Path wrapperDir = wsDir.resolve(".mvn").resolve("wrapper");
+        Files.createDirectories(wrapperDir);
+
+        String props = "# Maven Wrapper properties — managed by ike:init from workspace.yaml\n"
+                + "maven.version=" + mavenVersion + "\n"
+                + "distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/"
+                + "apache-maven/" + mavenVersion + "/apache-maven-" + mavenVersion
+                + "-bin.zip\n";
+        Files.writeString(wrapperDir.resolve("maven-wrapper.properties"), props,
+                StandardCharsets.UTF_8);
+
+        Path mvnw = wsDir.resolve("mvnw");
+        String script = """
+                #!/bin/sh
+                # Maven Wrapper launcher — installed by ike:init
+                # Downloads and caches the Maven version specified in
+                # .mvn/wrapper/maven-wrapper.properties
+                #
+                # This is a minimal bootstrap. For the full-featured wrapper script,
+                # run: mvn wrapper:wrapper
+
+                set -e
+
+                PROPS_FILE="$(dirname "$0")/.mvn/wrapper/maven-wrapper.properties"
+                if [ ! -f "$PROPS_FILE" ]; then
+                    echo "Error: $PROPS_FILE not found" >&2
+                    exit 1
+                fi
+
+                DIST_URL=$(grep '^distributionUrl=' "$PROPS_FILE" | cut -d'=' -f2-)
+                MAVEN_VERSION=$(grep '^maven.version=' "$PROPS_FILE" | cut -d'=' -f2-)
+
+                WRAPPER_HOME="${HOME}/.m2/wrapper/dists/apache-maven-${MAVEN_VERSION}"
+                MAVEN_HOME="${WRAPPER_HOME}/apache-maven-${MAVEN_VERSION}"
+
+                if [ ! -d "$MAVEN_HOME" ]; then
+                    echo "Downloading Maven ${MAVEN_VERSION}..."
+                    mkdir -p "$WRAPPER_HOME"
+                    ZIP_FILE="${WRAPPER_HOME}/apache-maven-${MAVEN_VERSION}-bin.zip"
+                    curl -fsSL -o "$ZIP_FILE" "$DIST_URL"
+                    unzip -qo "$ZIP_FILE" -d "$WRAPPER_HOME"
+                    rm -f "$ZIP_FILE"
+                    echo "Maven ${MAVEN_VERSION} installed to ${MAVEN_HOME}"
+                fi
+
+                exec "$MAVEN_HOME/bin/mvn" "$@"
+                """;
+        Files.writeString(mvnw, script, StandardCharsets.UTF_8);
+        mvnw.toFile().setExecutable(true);
+
+        Path mvnwCmd = wsDir.resolve("mvnw.cmd");
+        String cmdScript = """
+                @REM Maven Wrapper launcher — installed by ike:init
+                @REM Downloads and caches the Maven version specified in
+                @REM .mvn/wrapper/maven-wrapper.properties
+                @echo off
+                setlocal
+
+                set "PROPS_FILE=%~dp0.mvn\\wrapper\\maven-wrapper.properties"
+                if not exist "%PROPS_FILE%" (
+                    echo Error: %PROPS_FILE% not found >&2
+                    exit /b 1
+                )
+
+                for /f "tokens=1,* delims==" %%a in ('findstr "^maven.version=" "%PROPS_FILE%"') do set "MAVEN_VERSION=%%b"
+                for /f "tokens=1,* delims==" %%a in ('findstr "^distributionUrl=" "%PROPS_FILE%"') do set "DIST_URL=%%b"
+
+                set "WRAPPER_HOME=%USERPROFILE%\\.m2\\wrapper\\dists\\apache-maven-%MAVEN_VERSION%"
+                set "MAVEN_HOME=%WRAPPER_HOME%\\apache-maven-%MAVEN_VERSION%"
+
+                if not exist "%MAVEN_HOME%" (
+                    echo Downloading Maven %MAVEN_VERSION%...
+                    mkdir "%WRAPPER_HOME%" 2>nul
+                    set "ZIP_FILE=%WRAPPER_HOME%\\apache-maven-%MAVEN_VERSION%-bin.zip"
+                    powershell -Command "Invoke-WebRequest -Uri '%DIST_URL%' -OutFile '%ZIP_FILE%'"
+                    powershell -Command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '%WRAPPER_HOME%' -Force"
+                    del "%ZIP_FILE%"
+                    echo Maven %MAVEN_VERSION% installed to %MAVEN_HOME%
+                )
+
+                "%MAVEN_HOME%\\bin\\mvn.cmd" %*
+                """;
+        Files.writeString(mvnwCmd, cmdScript, StandardCharsets.UTF_8);
     }
 
     private void writeFile(Path path, String content) throws IOException {

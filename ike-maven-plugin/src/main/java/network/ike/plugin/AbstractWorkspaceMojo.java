@@ -173,7 +173,8 @@ abstract class AbstractWorkspaceMojo extends AbstractMojo {
             }
         } else {
             // IDE fallback — System.in is connected to IntelliJ's Run console
-            getLog().info(promptLabel + ": ");
+            System.out.print(promptLabel + ": ");
+            System.out.flush();
             try {
                 java.io.BufferedReader reader = new java.io.BufferedReader(
                         new java.io.InputStreamReader(System.in));

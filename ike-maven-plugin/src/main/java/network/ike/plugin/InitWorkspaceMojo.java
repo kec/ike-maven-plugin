@@ -131,6 +131,11 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             }
         }
 
+        // Ensure Maven wrapper at the workspace root itself (the aggregator POM)
+        if (ensureWorkspaceRootWrapper(root, defaults)) {
+            wrappers++;
+        }
+
         getLog().info("");
         getLog().info("  Done: " + cloned + " cloned, " + syncthing
                 + " Syncthing-initialized, " + skipped + " already present"
@@ -171,6 +176,76 @@ public class InitWorkspaceMojo extends AbstractWorkspaceMojo {
             return component.mavenVersion();
         }
         return defaults.mavenVersion();
+    }
+
+    /**
+     * Ensure the Maven wrapper is installed at the workspace root directory.
+     * The workspace aggregator POM needs the wrapper so that IntelliJ (and
+     * command-line builds) resolve to the correct Maven version rather than
+     * falling back to the system default.
+     *
+     * <p>Uses the workspace default maven-version from {@code workspace.yaml}.
+     *
+     * @param root     the workspace root directory
+     * @param defaults workspace defaults
+     * @return true if wrapper was installed or updated
+     */
+    private boolean ensureWorkspaceRootWrapper(File root, Defaults defaults) {
+        String mavenVersion = defaults.mavenVersion();
+        if (mavenVersion == null) {
+            return false;
+        }
+
+        File pomFile = new File(root, "pom.xml");
+        if (!pomFile.exists()) {
+            return false;
+        }
+
+        try {
+            Path wrapperDir = root.toPath().resolve(".mvn").resolve("wrapper");
+            Path propsFile = wrapperDir.resolve("maven-wrapper.properties");
+
+            if (propsFile.toFile().exists()) {
+                Properties existing = new Properties();
+                try (var reader = Files.newBufferedReader(propsFile, StandardCharsets.UTF_8)) {
+                    existing.load(reader);
+                }
+                String currentVersion = existing.getProperty("maven.version");
+                if (mavenVersion.equals(currentVersion)) {
+                    getLog().debug("    Workspace root Maven wrapper already at " + mavenVersion);
+                    return false;
+                }
+                getLog().info("  ↻ workspace root — updating Maven wrapper: "
+                        + currentVersion + " → " + mavenVersion);
+            } else {
+                getLog().info("  + workspace root — installing Maven wrapper for Maven "
+                        + mavenVersion);
+            }
+
+            Files.createDirectories(wrapperDir);
+
+            String props = "# Maven Wrapper properties — managed by ike:init from workspace.yaml\n"
+                    + "maven.version=" + mavenVersion + "\n"
+                    + "distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/"
+                    + "apache-maven/" + mavenVersion + "/apache-maven-" + mavenVersion
+                    + "-bin.zip\n";
+            Files.writeString(propsFile, props, StandardCharsets.UTF_8);
+
+            Path mvnw = root.toPath().resolve("mvnw");
+            if (!mvnw.toFile().exists()) {
+                writeMvnwScript(mvnw);
+            }
+
+            Path mvnwCmd = root.toPath().resolve("mvnw.cmd");
+            if (!mvnwCmd.toFile().exists()) {
+                writeMvnwCmdScript(mvnwCmd);
+            }
+
+            return true;
+        } catch (IOException e) {
+            getLog().warn("    Could not install workspace root Maven wrapper: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
