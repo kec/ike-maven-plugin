@@ -1,0 +1,387 @@
+package network.ike.plugin.ws;
+
+import network.ike.plugin.ReleaseSupport;
+
+import network.ike.workspace.Component;
+import network.ike.workspace.WorkspaceGraph;
+import network.ike.plugin.ws.vcs.VcsOperations;
+import network.ike.plugin.ws.vcs.VcsState;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugins.annotations.Mojo;
+import org.apache.maven.plugins.annotations.Parameter;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.LinkedHashSet;
+
+/**
+ * Create a workspace checkpoint — build, tag, and deploy every component,
+ * then record the resulting checkpoint coordinates in a YAML file.
+ *
+ * <p>Each component is processed in topological order (dependencies before
+ * dependents). For each component the checkpoint engine:
+ * <ol>
+ *   <li>Derives an immutable checkpoint version from the current SNAPSHOT</li>
+ *   <li>Stamps the version, commits, and tags {@code checkpoint/<version>}</li>
+ *   <li>Runs {@code mvnw clean deploy} to build and publish to Nexus</li>
+ *   <li>Restores the SNAPSHOT version and commits</li>
+ * </ol>
+ *
+ * <p>After all components are checkpointed, a YAML file recording the
+ * checkpoint versions and tagged SHAs is written to
+ * {@code checkpoints/checkpoint-<name>.yaml} in the workspace root.
+ *
+ * <p>The checkpoint name is derived automatically from the current
+ * workspace branch and a compact UTC timestamp
+ * ({@code <branch>-<yyyyMMdd>-<HHmmss>}), making each checkpoint
+ * unique and intuitively linked to the branch it was created from.
+ * Override with {@code -Dname=<label>} when a custom label is needed.
+ *
+ * <p>All components must have a clean working tree before this goal runs.
+ *
+ * <pre>{@code
+ * mvn ike:ws-checkpoint                     # auto-derived name
+ * mvn ike:ws-checkpoint -Dname=sprint-42    # explicit name
+ * mvn ike:ws-checkpoint-dry-run             # preview
+ * }</pre>
+ *
+ * @see CheckpointSupport the per-component engine used by this goal
+ */
+@Mojo(name = "checkpoint", requiresProject = false, threadSafe = true)
+public class WsCheckpointMojo extends AbstractWorkspaceMojo {
+
+    private static final DateTimeFormatter ISO_UTC =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
+                    .withZone(ZoneOffset.UTC);
+
+    /**
+     * Checkpoint name. Used in the YAML filename and component tag paths.
+     * If omitted, auto-derived from the workspace branch and a compact
+     * UTC timestamp ({@code <branch>-<yyyyMMdd>-<HHmmss>}).
+     */
+    @Parameter(property = "name")
+    String name;
+
+    /** Deploy site to the remote server for each component. Opt-in — requires SSH proxy. */
+    @Parameter(property = "deploySite", defaultValue = "false")
+    boolean deploySite;
+
+    /** Skip tests during the build ({@code -DskipTests}). */
+    @Parameter(property = "skipVerify", defaultValue = "false")
+    boolean skipVerify;
+
+    /**
+     * Show what the checkpoint would do without running builds, writing
+     * files, or creating tags. Set automatically by
+     * {@code ike:ws-checkpoint-dry-run}.
+     */
+    @Parameter(property = "dryRun", defaultValue = "false")
+    boolean dryRun;
+
+    /** Creates this goal instance. */
+    public WsCheckpointMojo() {}
+
+    private static final DateTimeFormatter COMPACT_UTC =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+                    .withZone(ZoneOffset.UTC);
+
+    @Override
+    public void execute() throws MojoExecutionException {
+        WorkspaceGraph graph = loadGraph();
+        File root = workspaceRoot();
+
+        if (name == null || name.isBlank()) {
+            name = deriveCheckpointName(root);
+        }
+
+        // VCS bridge: catch-up before checkpoint
+        VcsOperations.catchUp(root, getLog());
+
+        String timestamp = ISO_UTC.format(Instant.now());
+        String author = resolveAuthor(root);
+
+        getLog().info("");
+        getLog().info("IKE Workspace — Checkpoint");
+        getLog().info("══════════════════════════════════════════════════════════════");
+        getLog().info("  Name:   " + name);
+        getLog().info("  Time:   " + timestamp);
+        getLog().info("  Author: " + author);
+        if (dryRun) {
+            getLog().info("  Mode:   DRY RUN — no builds, no tags, no files written");
+        }
+        getLog().info("");
+
+        // ── Validate all components are clean before starting ─────────
+        if (!dryRun) {
+            validateCleanWorktrees(graph, root);
+        }
+
+        // ── Checkpoint each component in dependency order ──────────────
+        List<ComponentSnapshot> snapshots = new ArrayList<>();
+        List<String> absentComponents = new ArrayList<>();
+
+        List<String> ordered = graph.topologicalSort(
+                new LinkedHashSet<>(graph.manifest().components().keySet()));
+
+        for (String compName : ordered) {
+            Component component = graph.manifest().components().get(compName);
+            File dir = new File(root, compName);
+            File gitDir = new File(dir, ".git");
+
+            if (!gitDir.exists()) {
+                absentComponents.add(compName);
+                getLog().info("  - " + compName + " [absent — skipped]");
+                continue;
+            }
+
+            String branch   = gitBranch(dir);
+            String snapshot = readVersion(dir);
+            String checkpointVersion =
+                    ReleaseSupport.deriveCheckpointVersion(snapshot, dir);
+            String tagName = "checkpoint/" + checkpointVersion;
+
+            var ct = graph.manifest().componentTypes().get(component.type());
+            boolean composite = ct != null
+                    && "composite".equals(ct.checkpointMechanism());
+
+            if (dryRun) {
+                String shortSha = gitShortSha(dir);
+                String sha      = gitFullSha(dir);
+                getLog().info("  ✓ " + compName + " [" + shortSha + "] " + branch);
+                getLog().info("    [DRY RUN] " + snapshot
+                        + " → " + checkpointVersion);
+                CheckpointSupport.dryRun(dir, checkpointVersion,
+                        deploySite, skipVerify, getLog());
+                snapshots.add(new ComponentSnapshot(
+                        compName, sha, shortSha, branch,
+                        checkpointVersion, false, component.type(), composite));
+            } else {
+                getLog().info("  ⚙ " + compName + ": "
+                        + snapshot + " → " + checkpointVersion);
+                checkpointComponent(dir, checkpointVersion);
+
+                // Record the SHA the tag points to, not the post-restore HEAD
+                String tagSha = ReleaseSupport.execCapture(dir,
+                        "git", "rev-parse", tagName);
+                String shortTagSha = tagSha.length() >= 8
+                        ? tagSha.substring(0, 8) : tagSha;
+                getLog().info("  ✓ " + compName + " ["
+                        + shortTagSha + "] → " + tagName);
+                snapshots.add(new ComponentSnapshot(
+                        compName, tagSha, shortTagSha, branch,
+                        checkpointVersion, false, component.type(), composite));
+            }
+        }
+
+        // ── Build checkpoint YAML ──────────────────────────────────────
+        String yamlContent = buildCheckpointYaml(
+                name, timestamp, author,
+                graph.manifest().schemaVersion(),
+                snapshots, absentComponents);
+
+        if (dryRun) {
+            getLog().info("");
+            getLog().info("[DRY RUN] Checkpoint file would be written to:");
+            getLog().info("[DRY RUN]   checkpoints/" + checkpointFileName(name));
+            getLog().info("");
+            getLog().info("[DRY RUN] Contents:");
+            yamlContent.lines().forEach(line ->
+                    getLog().info("[DRY RUN]   " + line));
+            getLog().info("");
+            return;
+        }
+
+        // ── Write checkpoint file ──────────────────────────────────────
+        Path checkpointsDir = root.toPath().resolve("checkpoints");
+        try {
+            Files.createDirectories(checkpointsDir);
+        } catch (IOException e) {
+            throw new MojoExecutionException(
+                    "Cannot create checkpoints directory", e);
+        }
+        Path checkpointFile = checkpointsDir.resolve(checkpointFileName(name));
+        try {
+            Files.writeString(checkpointFile, yamlContent, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new MojoExecutionException(
+                    "Failed to write " + checkpointFile, e);
+        }
+
+        // VCS bridge: write state file after checkpoint
+        for (var entry : graph.manifest().components().entrySet()) {
+            File compDir = new File(root, entry.getKey());
+            if (new File(compDir, ".git").exists()
+                    && VcsState.isIkeManaged(compDir.toPath())) {
+                VcsOperations.writeVcsState(compDir, VcsState.ACTION_CHECKPOINT);
+            }
+        }
+        if (VcsState.isIkeManaged(root.toPath())) {
+            VcsOperations.writeVcsState(root, VcsState.ACTION_CHECKPOINT);
+        }
+
+        getLog().info("");
+        getLog().info("  Checkpoint: " + checkpointFile);
+        getLog().info("  Components: " + snapshots.size()
+                + " | Absent: " + absentComponents.size());
+        getLog().info("");
+    }
+
+    // ── Per-component checkpoint (overridable for tests) ──────────────
+
+    /**
+     * Execute the per-component checkpoint. Calls {@link CheckpointSupport}
+     * directly — no subprocess spawn.
+     *
+     * <p>Override in tests to substitute a lighter-weight simulation
+     * that creates the git tag without running a real build.
+     *
+     * @param dir             component git root
+     * @param checkpointLabel version label (e.g.,
+     *                        {@code 1.0.0-checkpoint.20260330.abc1234})
+     * @throws MojoExecutionException if the checkpoint fails
+     */
+    protected void checkpointComponent(File dir, String checkpointLabel)
+            throws MojoExecutionException {
+        CheckpointSupport.checkpoint(dir, checkpointLabel,
+                deploySite, skipVerify, getLog());
+    }
+
+    // ── YAML generation (pure, static, testable) ──────────────────────
+
+    /**
+     * Build checkpoint YAML content from pre-gathered component data.
+     *
+     * <p>This is a pure function with no git or I/O dependencies,
+     * suitable for direct unit testing.
+     *
+     * @param name            checkpoint name
+     * @param timestamp       ISO-8601 UTC timestamp
+     * @param author          checkpoint author name
+     * @param schemaVersion   workspace schema version
+     * @param snapshots       component snapshots (checkpoint versions, not SNAPSHOTs)
+     * @param absentNames     names of components not checked out
+     * @return YAML checkpoint content
+     */
+    public static String buildCheckpointYaml(String name, String timestamp,
+                                              String author, String schemaVersion,
+                                              List<ComponentSnapshot> snapshots,
+                                              List<String> absentNames) {
+        List<String> yaml = new ArrayList<>();
+        yaml.add("# IKE Workspace Checkpoint");
+        yaml.add("# Generated by: mvn ike:ws-checkpoint");
+        yaml.add("#");
+        yaml.add("checkpoint:");
+        yaml.add("  name: \"" + name + "\"");
+        yaml.add("  created: \"" + timestamp + "\"");
+        yaml.add("  author: \"" + author + "\"");
+        yaml.add("  schema-version: \"" + schemaVersion + "\"");
+        yaml.add("");
+        yaml.add("  components:");
+
+        for (String absent : absentNames) {
+            yaml.add("    " + absent + ":");
+            yaml.add("      status: absent");
+        }
+
+        for (ComponentSnapshot snap : snapshots) {
+            yaml.add("    " + snap.name() + ":");
+            if (snap.version() != null) {
+                yaml.add("      version: \"" + snap.version() + "\"");
+                yaml.add("      tag: \"checkpoint/" + snap.version() + "\"");
+            }
+            yaml.add("      sha: \"" + snap.sha() + "\"");
+            yaml.add("      short-sha: \"" + snap.shortSha() + "\"");
+            yaml.add("      branch: \"" + snap.branch() + "\"");
+            yaml.add("      type: " + snap.type());
+            if (snap.compositeCheckpoint()) {
+                yaml.add("      # TODO: add view-coordinate from Tinkar runtime");
+            }
+        }
+
+        return String.join("\n", yaml) + "\n";
+    }
+
+    /**
+     * Derive the checkpoint YAML file name.
+     *
+     * @param checkpointName the checkpoint name
+     * @return file name in the form {@code checkpoint-<name>.yaml}
+     */
+    public static String checkpointFileName(String checkpointName) {
+        return "checkpoint-" + checkpointName + ".yaml";
+    }
+
+    // ── Private helpers ────────────────────────────────────────────────
+
+    /**
+     * Validate that all present components have clean working trees.
+     * Fails fast before any component is checkpointed.
+     */
+    private void validateCleanWorktrees(WorkspaceGraph graph, File root)
+            throws MojoExecutionException {
+        List<String> dirty = new ArrayList<>();
+        for (String compName : graph.manifest().components().keySet()) {
+            File dir = new File(root, compName);
+            if (!new File(dir, ".git").exists()) continue;
+            String status = gitStatus(dir);
+            if (!status.isEmpty()) {
+                dirty.add(compName);
+            }
+        }
+        if (!dirty.isEmpty()) {
+            throw new MojoExecutionException(
+                    "Cannot checkpoint — dirty working tree in: "
+                    + String.join(", ", dirty)
+                    + ". Commit or stash changes first.");
+        }
+    }
+
+    private String gitFullSha(File dir) {
+        try {
+            return ReleaseSupport.execCapture(dir, "git", "rev-parse", "HEAD");
+        } catch (MojoExecutionException e) {
+            return "unknown";
+        }
+    }
+
+    private String readVersion(File dir) throws MojoExecutionException {
+        return ReleaseSupport.readPomVersion(new File(dir, "pom.xml"));
+    }
+
+    private String resolveAuthor(File root) {
+        try {
+            return ReleaseSupport.execCapture(root, "git", "config", "user.name");
+        } catch (MojoExecutionException e) {
+            return System.getProperty("user.name", "unknown");
+        }
+    }
+
+    /**
+     * Derive a checkpoint name from the workspace branch and current UTC
+     * timestamp. The branch name is sanitized for use in filenames
+     * ({@code /} replaced with {@code -}).
+     *
+     * <p>Examples:
+     * <ul>
+     *   <li>{@code main} → {@code main-20260402-143022}</li>
+     *   <li>{@code feature/my-feature} → {@code feature-my-feature-20260402-143022}</li>
+     * </ul>
+     *
+     * @param root workspace root directory (must be a git repository)
+     * @return derived checkpoint name
+     */
+    private String deriveCheckpointName(File root) throws MojoExecutionException {
+        String branch = gitBranch(root);
+        String safeBranch = branch.replace('/', '-');
+        String compactTime = COMPACT_UTC.format(Instant.now());
+        return safeBranch + "-" + compactTime;
+    }
+}

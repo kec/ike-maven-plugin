@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  IKE Community — Maven Plugin
-  ═════════════════════════════
+  IKE Community — Workspace Maven Plugin
+  ═══════════════════════════════════════
 
-  Cross-platform Maven plugin providing release, workspace, feature
-  branching, documentation, and build management goals for IKE
-  projects. All logic is implemented in Java — no bash scripts.
+  Cross-platform Maven plugin for multi-repository workspace management:
+  initialization, verification, feature branching, release orchestration,
+  and checkpoint creation. All logic is implemented in Java.
 
   Build:    mvn install
-  Test:     mvn ike:help -pl ike-maven-plugin
-  Artifact: network.ike:ike-maven-plugin:<version>
+  Test:     mvn ws:help -pl ike-workspace-maven-plugin
+  Artifact: network.ike:ike-workspace-maven-plugin:<version>
 -->
 <project xmlns="http://maven.apache.org/POM/4.1.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -22,14 +22,14 @@
         <artifactId>ike-tooling</artifactId>
     </parent>
 
-    <artifactId>ike-maven-plugin</artifactId>
+    <artifactId>ike-workspace-maven-plugin</artifactId>
     <packaging>maven-plugin</packaging>
 
-    <name>IKE Maven Plugin</name>
+    <name>IKE Workspace Maven Plugin</name>
     <description>
-        Cross-platform Maven plugin providing release, documentation rendering,
-        site deployment, and build management goals for IKE projects.
-        Workspace goals are in ike-workspace-maven-plugin (ws: prefix).
+        Cross-platform Maven plugin for multi-repository workspace management:
+        initialization, verification, feature branching, release orchestration,
+        and checkpoint creation.
     </description>
     <url>https://github.com/kec/ike-tooling</url>
     <inceptionYear>2026</inceptionYear>
@@ -66,23 +66,22 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.deploy.skip>false</maven.deploy.skip>
         <maven.install.skip>false</maven.install.skip>
-        <maven-plugin-api.version>3.9.9</maven-plugin-api.version>
-        <maven-plugin-annotations.version>3.15.1</maven-plugin-annotations.version>
-        <maven-plugin-plugin.version>3.15.1</maven-plugin-plugin.version>
-        <asm.version>9.9.1</asm.version>
-        <!-- AsciidoctorJ toolchain for ike:asciidoc goal -->
-        <asciidoctorj.version>3.0.1</asciidoctorj.version>
-        <asciidoctorj-pdf.version>2.3.23</asciidoctorj-pdf.version>
-        <asciidoctorj-diagram.version>3.2.1</asciidoctorj-diagram.version>
-        <koncept-extension.version>35</koncept-extension.version>
     </properties>
 
     <dependencies>
+        <!-- Shared utilities from ike-maven-plugin (ReleaseSupport, etc.) -->
+        <dependency>
+            <groupId>network.ike</groupId>
+            <artifactId>ike-maven-plugin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Workspace model library -->
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-workspace-model</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- Maven plugin API -->
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
@@ -101,39 +100,8 @@
             <version>${maven-plugin-api.version}</version>
             <scope>provided</scope>
         </dependency>
-        <!-- ── AsciidoctorJ toolchain (ike:asciidoc goal) ──────────── -->
-        <dependency>
-            <groupId>org.asciidoctor</groupId>
-            <artifactId>asciidoctorj</artifactId>
-            <version>${asciidoctorj.version}</version>
-            <exclusions>
-                <exclusion>
-                    <groupId>org.jruby</groupId>
-                    <artifactId>jruby-base</artifactId>
-                </exclusion>
-            </exclusions>
-        </dependency>
-        <dependency>
-            <groupId>org.asciidoctor</groupId>
-            <artifactId>asciidoctorj-pdf</artifactId>
-            <version>${asciidoctorj-pdf.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.asciidoctor</groupId>
-            <artifactId>asciidoctorj-diagram</artifactId>
-            <version>${asciidoctorj-diagram.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.jruby</groupId>
-            <artifactId>jruby</artifactId>
-            <version>${jruby.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>network.ike</groupId>
-            <artifactId>koncept-asciidoc-extension</artifactId>
-            <version>${koncept-extension.version}</version>
-        </dependency>
 
+        <!-- Test -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -144,18 +112,6 @@
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <version>${assertj.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers</artifactId>
-            <version>${testcontainers.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>testcontainers-junit-jupiter</artifactId>
-            <version>${testcontainers.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -173,15 +129,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.2</version>
                     <configuration>
-                        <!-- Integration tests spawn git/mvn subprocesses that write
-                             to stdout. inheritIO() in ReleaseSupport.exec() sends
-                             subprocess output to the JVM's stdout, which corrupts
-                             surefire's fork communication protocol. Redirect all
-                             test output to files to keep the channel clean. -->
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
-                        <!-- Exclude container tests by default — they need Docker.
-                             Run with: mvn verify -Dsurefire.excludedGroups=""
-                             Run all tests including container tests. -->
                         <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                     </configuration>
                 </plugin>
@@ -195,6 +143,7 @@
                 <version>${maven-plugin-plugin.version}</version>
                 <configuration>
                     <requiredJavaVersion>${java.version}</requiredJavaVersion>
+                    <goalPrefix>ws</goalPrefix>
                 </configuration>
                 <dependencies>
                     <dependency>
@@ -213,12 +162,6 @@
                         <version>${asm.version}</version>
                     </dependency>
                 </dependencies>
-            </plugin>
-            <!-- Self-invoke: uses the installed SNAPSHOT to render site content.
-                 Requires mvn install before mvn site (same as ike:release). -->
-            <plugin>
-                <groupId>network.ike</groupId>
-                <artifactId>ike-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

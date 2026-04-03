@@ -1,7 +1,5 @@
 package network.ike.plugin;
 
-import network.ike.plugin.vcs.VcsOperations;
-import network.ike.plugin.vcs.VcsState;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -44,7 +42,6 @@ import java.util.List;
  * <p>Usage: {@code mvn ike:release} (auto-derives version from POM),
  * or override with {@code mvn ike:release -DreleaseVersion=2}
  *
- * @see CheckpointSupport
  */
 @Mojo(name = "release", requiresProject = false, aggregator = true, threadSafe = true)
 public class ReleaseMojo extends AbstractMojo {
@@ -78,8 +75,8 @@ public class ReleaseMojo extends AbstractMojo {
         File startDir = baseDir != null ? baseDir : new File(".");
         File gitRoot = ReleaseSupport.gitRoot(startDir);
 
-        // VCS bridge: catch-up before release
-        VcsOperations.catchUp(gitRoot, getLog());
+        // VCS bridge catch-up moved to ws:sync — run before ike:release
+        // if using the Syncthing-based VCS bridge across machines.
         File mvnw = ReleaseSupport.resolveMavenWrapper(gitRoot, getLog());
         File rootPom = new File(gitRoot, "pom.xml");
 
@@ -378,8 +375,8 @@ public class ReleaseMojo extends AbstractMojo {
             }
         }
 
-        // VCS bridge: write state file after release
-        VcsOperations.writeVcsState(gitRoot, VcsState.ACTION_RELEASE);
+        // VCS state file now managed by ws:release for workspace-level
+        // releases. Single-repo ike:release does not write VCS state.
 
         getLog().info("");
         getLog().info("Release " + releaseVersion + " complete.");

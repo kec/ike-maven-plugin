@@ -322,5 +322,6 @@
     <subprojects>
         <subproject>ike-workspace-model</subproject>
         <subproject>ike-maven-plugin</subproject>
+        <subproject>ike-workspace-maven-plugin</subproject>
     </subprojects>
 </project>

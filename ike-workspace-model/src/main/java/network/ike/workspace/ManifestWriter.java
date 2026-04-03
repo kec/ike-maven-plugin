@@ -103,7 +103,7 @@ public final class ManifestWriter {
      * @param newValue      the new value
      * @return updated YAML content
      */
-    static String updateComponentField(String yaml, String componentName,
+    public static String updateComponentField(String yaml, String componentName,
                                         String field, String newValue) {
         String escapedName = Pattern.quote(componentName);
         String escapedField = Pattern.quote(field);
