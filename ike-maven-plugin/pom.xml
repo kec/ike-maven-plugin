@@ -78,6 +78,15 @@
     </properties>
 
     <dependencies>
+        <!-- Claude instruction files (unpacked at validate phase) -->
+        <dependency>
+            <groupId>network.ike</groupId>
+            <artifactId>ike-build-standards</artifactId>
+            <version>${project.version}</version>
+            <classifier>claude</classifier>
+            <type>zip</type>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-workspace-model</artifactId>

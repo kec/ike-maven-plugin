@@ -25,14 +25,14 @@ and build-time utilities for IKE Community projects.
 [source,bash]
 ----
 # Workspace status
-mvn ike:dashboard
+mvn ws:dashboard
 
-# Release
+# Release (single-repo)
 mvn ike:release
 
 # Feature branch workflow
-mvn ike:feature-start -Dfeature=my-feature
-mvn ike:feature-finish -Dfeature=my-feature
+mvn ws:feature-start -Dfeature=my-feature
+mvn ws:feature-finish -Dfeature=my-feature
 
 # Site deployment
 mvn ike:deploy-site -DsiteType=snapshot

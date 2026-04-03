@@ -15,7 +15,7 @@ import java.io.File;
  * Sets {@code IKE_VCS_CONTEXT} so the pre-push hook allows new
  * ref creation if needed.
  *
- * <p>Usage: {@code mvnw ike:push}
+ * <p>Usage: {@code mvnw ws:push}
  */
 @Mojo(name = "push", requiresProject = false, threadSafe = true)
 public class PushMojo extends AbstractWorkspaceMojo {

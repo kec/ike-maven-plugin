@@ -1,0 +1,753 @@
+// ike-workspace-conventions
+// Topic: IKE Workspace Conventions — Rationale and Design
+// Type: concept
+// Status: draft
+:topic-id: ike-workspace-conventions
+:topic-type: concept
+:topic-status: draft
+:topic-keywords: workspace, versioning, Maven 4, defense-in-depth, Swiss cheese, SyncthingOk,
+:topic-scope-note: Rationale and conventions for multi-machine IKE development. \
+  For workspace management, see the ike-maven-plugin goals (ws:init, ws:status, ws:dashboard).
+
+[[ike-workspace-conventions]]
+= IKE Workspace Conventions
+
+== The Problem
+
+IKE developers work across multiple machines.
+A developer editing source on a Mac Studio needs to continue that work
+on a MacBook Pro — sometimes at a natural commit point,
+sometimes mid-thought with uncommitted changes.
+The traditional approach — a single clone,
+branch switching,
+stash/unstash rituals — creates friction and risk.
+The risk compounds when multiple feature branches are active simultaneously.
+
+This document defines the *IKE Workspace* convention:
+a disciplined approach to multi-machine,
+multi-branch development that provides safety through layered defenses
+rather than relying on any single mechanism.
+
+== Design Principles
+
+Three principles guide the IKE Workspace design:
+
+*Every checkout is self-describing.*
+Given a Git commit hash,
+you know exactly what artifact coordinates will be produced.
+No ambient state,
+no build-time injection,
+no hidden inputs.
+The POM is a declarative specification of what the artifact _is_,
+not a template that produces different artifacts depending on
+who builds it or where.
+
+*Every workspace is a peer.*
+No workspace is "the original" or "the primary clone."
+Any workspace can be the origin point for a new one.
+This mirrors the IKE Community's broader architectural principle:
+no single point of authority,
+collaborative curation across organizational boundaries.
+
+*Safety through layered defense, not single mechanisms.*
+No single convention prevents all classes of error.
+We stack defenses so that each layer catches
+what the previous layer misses.
+
+== Defense in Depth — The Swiss Cheese Model
+
+James Reason's Swiss cheese model,
+widely applied in aviation and healthcare safety,
+observes that every defensive layer has holes.
+Accidents occur when the holes in successive layers align,
+allowing a failure to pass through every defense.
+The remedy is not to demand perfection from any single layer
+but to stack enough layers that alignment becomes improbable.
+
+The IKE Workspace convention applies four defensive layers:
+
+=== Layer 1: Separate Workspace Directories
+
+Each feature branch lives in its own directory — a full Git clone
+with a predictable name derived from the branch.
+
+----
+~/Projects/ike/
+  shield-terminology/         ← shield/terminology-refresh branch
+  stamp-coordinates/          ← stamp/coordinate-refactor branch
+  piqi-framework/             ← piqi/framework-update branch
+----
+
+*What this defends against:*
+Working tree confusion — editing files on the wrong branch,
+building with uncommitted changes from an unrelated feature.
+
+*Where the holes are:*
+Separate directories do not prevent artifacts from colliding
+in shared state (the Maven local repository, a deployment target).
+A developer can still `mvn deploy` from the wrong workspace.
+
+=== Layer 2: Maven 4 Project-Local Repository
+
+Maven 4 supports a project-local installed artifact repository,
+configured in `.mvn/maven.properties`:
+
+[source,properties]
+----
+maven.repo.local.path.installed=${session.rootDirectory}/.mvn/local-repo
+----
+
+When `mvn install` runs,
+artifacts are written to `.mvn/local-repo/` within the workspace —
+not to the shared `~/.m2/repository`.
+Each workspace's build output is isolated from every other workspace.
+
+The shared `~/.m2/repository` becomes a pure download cache:
+artifacts resolved from Maven Central and other remote repositories.
+It is safe to share because it contains only published,
+immutable release artifacts —
+never local SNAPSHOT builds.
+
+*What this defends against:*
+Build-time cross-contamination.
+Two workspaces building the same module at different SNAPSHOT states
+no longer overwrite each other's artifacts.
+
+*Where the holes are:*
+Project-local repos are a build-time mechanism.
+Once an artifact leaves the workspace —
+via `mvn deploy` to a remote repository,
+or via a CI pipeline —
+the project-local repo provides no protection.
+The artifact's version string is its only identity at that point.
+
+=== Layer 3: Branch-Qualified Versions
+
+Each workspace's artifacts carry a version that identifies their branch lineage:
+
+----
+1.2.0-shield-terminology-SNAPSHOT
+1.2.0-stamp-coordinates-SNAPSHOT
+----
+
+The `main` branch retains the unqualified version:
+
+----
+1.2.0-SNAPSHOT
+----
+
+*What this defends against:*
+Deployment collision.
+If a developer accidentally runs `mvn deploy` from a feature workspace,
+the artifact publishes under a distinct version coordinate —
+it cannot silently overwrite the main-branch artifact.
+It also provides *provenance*:
+six months later,
+an artifact's version string tells you which branch produced it.
+
+*Where the holes are:*
+Someone could forget to set the branch-qualified version.
+The `ws:init` goal automates this,
+but a manual `git clone` bypasses the goal.
+
+=== Layer 4: Syncthing with Git Isolation
+
+Syncthing provides real-time file synchronization between machines,
+ensuring that uncommitted work-in-progress
+is available on any machine within seconds.
+
+Critically, `.git/` directories are excluded from synchronization.
+Each machine maintains its own independent Git state.
+Syncthing handles the working tree;
+Git handles versioned history via push/pull to the remote.
+
+*What this defends against:*
+Stale files when switching machines.
+A developer can walk away from the Studio
+and resume on the MacBook Pro with current source files,
+even if they have not committed or pushed.
+
+*Where the holes are:*
+Git history is not synchronized in real time.
+If the developer made commits on the Studio but did not push,
+the MacBook Pro has current _files_ but stale _history_.
+The developer must `git fetch` to synchronize history.
+
+=== The Stack
+
+[cols="1,2,2"]
+|===
+|Layer |Defends Against |Hole
+
+|Separate workspaces
+|Working tree confusion
+|Shared state collision
+
+|Project-local repo
+|Build-time cross-contamination
+|Artifacts leaving the workspace
+
+|Branch-qualified versions
+|Deploy/publish collision, provenance loss
+|Manual clone bypassing the goal
+
+|Syncthing + Git isolation
+|Stale files between machines
+|Git history not synced in real time
+|===
+
+No single layer is sufficient.
+Together,
+the probability of a corrupted deployment or misidentified artifact
+approaches zero.
+
+== Leaning Into Maven 4
+
+The IKE pipeline uses Maven 4 with POM model 4.1.0.
+Several conventions in this document depend on capabilities
+that did not exist in Maven 3.
+It is worth being explicit about what changed,
+because the Maven ecosystem carries a great deal of inherited folklore
+that no longer applies.
+
+=== Ghosts of Maven 3
+
+Maven 3 required child modules to declare their parent version explicitly:
+
+[source,xml]
+----
+<!-- Maven 3: version required in every child -->
+<parent>
+    <groupId>network.ike</groupId>
+    <artifactId>ike-parent</artifactId>
+    <version>1.1.0-SNAPSHOT</version>
+</parent>
+----
+
+Changing the parent version meant editing every child POM.
+For the IKE pipeline with 11+ modules,
+this created real friction —
+noisy commits touching many files,
+merge conflicts on version strings,
+and human error when a module was missed.
+
+The Maven community responded with `${revision}` —
+a CI-friendly property that allowed the version to be injected at build time.
+This solved the N-file-edit problem
+but introduced a new one:
+the checkout was no longer self-describing.
+The POM said `<version>${revision}</version>`,
+and the actual version depended on command-line arguments,
+`.mvn/maven.properties`,
+or CI pipeline configuration.
+The artifact's identity became ambient rather than declarative.
+
+=== What Maven 4 / POM 4.1.0 Fixed
+
+Maven 4 resolved the underlying problem that `${revision}` was working around.
+
+*Parent version resolution from the reactor.*
+In POM 4.1.0,
+child modules within a reactor omit the parent version entirely:
+
+[source,xml]
+----
+<!-- Maven 4.1.0: no version needed — resolved from reactor -->
+<parent>
+    <groupId>network.ike</groupId>
+    <artifactId>ike-parent</artifactId>
+</parent>
+----
+
+The reactor knows that `ike-parent` is a sibling module
+and resolves its version from the reactor graph.
+One version declaration in `ike-parent/pom.xml`,
+every child inherits it.
+
+*Inter-module dependency resolution.*
+Similarly, dependencies on reactor siblings are resolved
+without explicit version declarations.
+The BOM handles version coordination
+for modules consumed outside the reactor.
+
+*The result:*
+Changing the pipeline version is a one-line edit in one file.
+The commit diff is one line.
+The merge conflict, if any, is one line.
+The checkout is self-describing.
+The artifact identity is declarative.
+
+`${revision}` solved a problem that no longer exists.
+It is a ghost — an inherited workaround
+whose original justification has been removed by the platform.
+
+=== A Note on DevOps Orthodoxy
+
+The `${revision}` pattern persists in Maven documentation and blog posts
+not because the underlying problem persists,
+but because it serves the CI/CD pipeline author's workflow.
+For a platform team managing hundreds of microservices
+with automated release trains,
+injecting versions at build time is operationally convenient.
+The pipeline becomes the source of truth,
+and humans rarely inspect POMs.
+
+This is a legitimate optimization — for that context.
+
+The error is in universalizing it.
+When DevOps practices are adopted uncritically,
+they optimize for pipeline convenience
+at the expense of developer comprehension and build safety.
+The tail wags the dog.
+The insight of _what to build_ does not originate in the CI pipeline.
+The project's identity —
+its version, its coordinates, its provenance —
+is a design decision that belongs to the project owner,
+not an operational detail to be injected at deployment time.
+
+When a DevOps convention removes a safety layer
+(self-describing checkouts, reproducible builds from source alone)
+to simplify pipeline configuration,
+the project owner should push back.
+Convenience in the pipeline is not worth ambiguity in the artifact.
+The IKE Community's position is clear:
+the POM declares what the artifact _is_.
+The build reproduces it.
+The pipeline ships it.
+The order of authority flows from design to implementation to operations,
+not the reverse.
+
+== Unified Versioning
+
+=== The Case Against Independent Module Versions
+
+Traditional Maven practice assigns independent versions to each module:
+`ike-parent 1.2.0`, `docbook-xsl 1.3.1`, `minimal-fonts 1.1.0`.
+The rationale is that modules with different release cadences
+should communicate their change scope through independent version numbers.
+
+For the IKE pipeline, this rationale does not survive contact with reality.
+
+*No module has independent consumers.*
+Every downstream IKE project consumes the pipeline
+through parent POM inheritance and BOM import.
+No consumer declares `<dependency>docbook-xsl</dependency><version>1.3.2</version>`.
+Individual module versions are invisible to consumers.
+They see the BOM version and the parent version.
+
+*Independent versions create coordination overhead without benefit.*
+Maintaining a compatibility matrix
+(which `docbook-xsl` versions work with which `ike-parent` versions)
+serves no one when the modules are always released together
+and always consumed together.
+
+*The pipeline is a platform, not a library collection.*
+The Apache Commons model — independent libraries,
+independent consumers,
+independent release cadences —
+makes sense for a loose collection of utilities.
+The IKE pipeline is a coherent platform
+whose components are designed to work as a unit.
+The Spring Boot model — release together,
+version together — is the correct analogy.
+
+=== Unified Version Convention
+
+All modules in the IKE pipeline reactor share a single version.
+The version is declared in `ike-parent/pom.xml`
+and propagates to child modules via Maven 4 reactor resolution
+and parent inheritance.
+
+Standalone infrastructure modules
+(`ike-build-standards`, `ike-build-tools`, `ike-doc-resources`,
+`minimal-fonts`, `docbook-xsl`, `koncept-asciidoc-extension`)
+declare the same version explicitly in their own POMs —
+they do not inherit from the parent chain,
+but they release at the same version as the parent.
+
+*Versioning policy:*
+
+* Pipeline versions are sequential: 1.1.0, 1.2.0, 1.3.0, and so on.
+* No semantic versioning contract is implied.
+  Each release supersedes the previous one.
+  The version number is an ordering, not a compatibility encoding.
+* The minor version serves as the release sequence number.
+  Major version increments are reserved
+  for foundational infrastructure changes.
+* All modules in the reactor share the unified version.
+* The BOM exports all module versions at the unified pipeline version.
+* Branch-qualified versions append the branch name:
+  `1.3.0-shield-terminology-SNAPSHOT`.
+
+== IKE Workspace Directory Convention
+
+=== Layout
+
+All IKE Workspaces for a given repository
+live under a common parent directory:
+
+----
+~/Projects/ike/
+  <safe-branch-name>/        ← one directory per active branch
+----
+
+The safe branch name is derived from the Git branch name
+by replacing `/` with `-`.
+For example, `shield/terminology-refresh` becomes `shield-terminology-refresh`.
+
+The `main` branch workspace, if present, is named `main/`.
+
+=== Creation
+
+The `ws:init` goal creates workspaces:
+
+[source,bash]
+----
+# Create a workspace branching from origin/main
+mvn ws:init -Dbranch=shield/terminology-refresh
+
+# Create a workspace branching from the current workspace's branch
+mvn ws:init -Dbranch=shield/terminology-mappings -DfromHere
+
+# Show workspace status
+mvn ws:status
+
+# Show workspace dashboard
+mvn ws:dashboard
+----
+
+When `-DfromHere` is used,
+the goal pushes the current branch to the remote
+before creating the new workspace.
+This ensures that the branch point is recorded in Git history.
+
+After cloning and checking out the branch,
+the goal sets the branch-qualified version
+by editing the version in `ike-parent/pom.xml`
+and committing the change.
+
+=== Syncthing Configuration
+
+The workspace parent directory (`~/Projects/ike/`)
+is configured as a Syncthing shared folder between machines.
+
+The `.stignore` file at that level excludes:
+
+----
+**/target/
+**/.mvn/local-repo/
+**/.idea/
+**/*.iml
+**/.DS_Store
+**/.git/
+**/node_modules/
+**/*.rocksdb/
+----
+
+Key exclusions:
+
+* `.git/` — each machine maintains independent Git state.
+  Syncthing handles the working tree; Git handles history.
+* `.mvn/local-repo/` — project-local Maven repository.
+  Build artifacts are machine-specific.
+* `target/` — build output. Rebuilt locally.
+* `.idea/` — IDE state. Per-machine.
+
+=== Cross-Machine Workflow
+
+The typical workflow for switching machines:
+
+. Work in a workspace on Machine A. Edit, build, test.
+  Syncthing propagates source file changes to Machine B in real time.
+. Walk to Machine B.
+  The working tree is current — even uncommitted changes are present.
+. Run `git fetch origin` to synchronize Git history
+  (only necessary if commits were made on Machine A).
+. Continue working.
+
+For a clean transition at a commit boundary:
+
+. On Machine A: `git commit` and `git push`.
+. On Machine B: `git pull`. Build and continue.
+
+For a mid-thought transition (uncommitted work):
+
+. On Machine A: just walk away.
+  Syncthing has already propagated the changes.
+. On Machine B: the files are there. Continue editing.
+. When ready to commit, commit normally.
+  Git operates on the local working tree,
+  which Syncthing has kept current.
+
+== Release Process — Design Constraints
+
+The IKE Workspace and checkpoint cascade patterns
+impose constraints on any release process.
+This section establishes those constraints
+and the script inventory that will implement them.
+The scripts themselves are placeholders for iterative development —
+the release process will mature through use,
+not through upfront design.
+
+=== Why Not the Maven Release Plugin or GitFlow Plugin?
+
+The `maven-release-plugin` and `maven-gitflow-plugin`
+encode workflow assumptions that do not match the IKE context.
+Both assume a linear version progression on a single branch.
+Neither understands:
+
+* Branch-qualified versions that must be stripped on merge
+* Checkpoint versions interleaved with development SNAPSHOTs
+* The separation between dependency coordination,
+  release management, and continuous validation
+  articulated in the Checkpoint Cascade whitepaper
+
+These plugins conflate concerns.
+They try to handle version manipulation,
+Git branch operations,
+build execution,
+and deployment in a single opaque plugin goal.
+When their assumptions don't match your workflow,
+you fight the plugin rather than the problem.
+
+The IKE Community does not use these plugins.
+Release operations are implemented as Maven plugin goals
+in `ike-maven-plugin`.
+This is a deliberate architectural choice, not a gap.
+
+=== Maven Plugin as the Implementation
+
+Release automation is implemented as Maven plugin goals
+in the `ike-maven-plugin` module.
+Each goal is an IDE-discoverable, clickable target
+in IntelliJ's Maven tool window with parameter prompts.
+
+The plugin provides:
+
+* *Discoverability.* Goals appear in the IDE.
+  A developer browsing the Maven tool window sees `ws:init`,
+  `ws:status`, `ws:feature-finish`, `ike:release` —
+  clickable, runnable targets.
+* *Transparency.* Release logic lives in `ReleaseSupport.java`,
+  a single utility class with clear method boundaries.
+* *Composability.* Goals invoke other goals.
+  Complex workflows are assembled from simple operations.
+* *Universality.* Maven runs on macOS, Linux, and Windows
+  without platform-specific shell dependencies.
+
+=== Version Transitions
+
+The IKE Workspace pattern creates version states
+that must be managed through the development lifecycle:
+
+----
+1.2.0-SNAPSHOT                              (main branch, development)
+1.2.0-shield-terminology-SNAPSHOT           (feature workspace, development)
+1.2.0-shield-terminology-checkpoint.20250222.1  (checkpoint, immutable)
+1.2.0                                       (release, immutable)
+----
+
+Key transitions:
+
+* *Workspace creation:* `1.2.0-SNAPSHOT` → `1.2.0-shield-terminology-SNAPSHOT`.
+  Automated by `mvn ws:init`.
+* *Checkpoint creation:* `1.2.0-shield-terminology-SNAPSHOT`
+  → `1.2.0-shield-terminology-checkpoint.20250222.1`.
+  Automated by `mvn ws:checkpoint`.
+  The SNAPSHOT version is not changed; the checkpoint is a tagged,
+  immutable build at a point in time.
+* *Merge to main:* `1.2.0-shield-terminology-SNAPSHOT` → `1.2.0-SNAPSHOT`.
+  The branch qualifier is stripped.
+  Automated by `mvn ws:feature-finish`.
+  PR reviewers should expect this version change in the diff —
+  it is structural, not a conflict.
+* *Release:* `1.2.0-SNAPSHOT` → `1.2.0`.
+  Automated by `mvn ike:release`.
+* *Post-release:* `1.2.0` → `1.3.0-SNAPSHOT`.
+  Automated by `mvn ike:release` (integrated into single goal).
+
+=== Goal Inventory
+
+The `ike-maven-plugin` provides:
+
+[cols="2,3"]
+|===
+|Goal |Purpose
+
+|`ws:init`
+|Create a new IKE Workspace (clone, branch, set version)
+
+|`ws:status`
+|Show workspace status (branch, version, uncommitted changes)
+
+|`ws:dashboard`
+|Show dashboard of all workspaces
+
+|`ws:feature-finish`
+|Strip branch qualifier, merge feature to main, tag
+
+|`ws:checkpoint`
+|Create immutable checkpoint from current branch
+
+|`ike:release`
+|Transition from SNAPSHOT to release version, build, tag, deploy, bump to next SNAPSHOT
+
+|`ws:release`
+|Workspace-level release orchestration — scan, filter dirty, topo-sort, release in dependency order
+
+|`ike:generate-bom`
+|Auto-generate a standalone BOM POM from `ike-parent` dependency management
+
+|`ws:verify`
+|PR validation
+|===
+
+Shared utility logic lives in `ReleaseSupport.java`
+in the `ike-maven-plugin` module.
+
+== Workspace Release Orchestration
+
+The `ws:release` goal automates multi-component releases
+across a workspace.
+It replaces manual per-component release sequences
+with a single orchestrated workflow
+that respects inter-repository dependency order.
+
+=== The Self-Limiting Cascade
+
+The release is _self-limiting_:
+only checked-out repositories with commits since their last release tag
+are candidates.
+Components that are not checked out or have no changes
+are silently skipped.
+
+The release scope is the intersection of two sets:
+
+. Components physically present in the workspace (checked out)
+. Components with commits since their last release tag (dirty)
+
+A workspace with three of ten components checked out
+will release at most three components --
+and only those with actual changes.
+
+=== Release Workflow
+
+The goal executes five phases:
+
+. *Scan* -- Walk the workspace manifest, identify checked-out repos.
+. *Filter dirty* -- For each checked-out repo,
+  compare HEAD against the last release tag.
+  Only repos with new commits are candidates.
+. *Topological sort* -- Order candidates by dependency graph
+  so that upstream components release before their dependents.
+. *Release in order* -- For each candidate (in topo order):
+  strip `-SNAPSHOT`, build, verify, tag,
+  optionally push (`-Dpush=true`),
+  bump to next SNAPSHOT.
+. *Update cross-references* -- After each release,
+  update parent version references in downstream POMs
+  that depend on the just-released component.
+
+The cross-reference update is the key to cascade consistency.
+When `ike-pipeline` releases version 24,
+downstream components that reference `ike-pipeline` as a parent
+are updated to `<version>24</version>` before they build.
+This ensures each component builds against the release version
+of its upstream dependency,
+not the previous SNAPSHOT.
+
+=== Pre-Release Checkpoint
+
+By default, `ws:release` creates a checkpoint
+before the first release to enable recovery.
+Use `-DskipCheckpoint=true` to bypass this.
+
+=== Examples
+
+[source,bash]
+----
+# Dry run — see what would be released and in what order
+mvn ws:release -DdryRun=true
+
+# Release all dirty components, push results
+mvn ws:release -Dpush=true
+
+# Release only ike-pipeline and its dirty dependents
+mvn ws:release -Dcomponent=ike-pipeline -Dpush=true
+
+# Release the "core" group without creating a checkpoint
+mvn ws:release -Dgroup=core -DskipCheckpoint=true -Dpush=true
+----
+
+=== Dry Run Output
+
+A dry run prints the release plan without executing:
+
+----
+[INFO] === Workspace Release Plan (DRY RUN) ===
+[INFO] Dirty components (topo order):
+[INFO]   1. ike-pipeline       24-SNAPSHOT → 24 → 25-SNAPSHOT
+[INFO]   2. tinkar-core         1.80.0-SNAPSHOT → 1.80.0 → 1.81.0-SNAPSHOT
+[INFO] Cross-reference updates:
+[INFO]   tinkar-core: ike-pipeline parent 24-SNAPSHOT → 24
+[INFO] Pre-release checkpoint: checkpoint/pre-release-20260320
+[INFO] === No changes made (dry run) ===
+----
+
+== Auto-Generated BOM
+
+The `ike:generate-bom` goal produces a standalone Bill of Materials (BOM) POM
+from `ike-parent` dependency management.
+The generated BOM resolves all property references to literal values,
+producing a self-contained POM that external consumers can import
+without inheriting `ike-parent`.
+
+The goal is bound to the `generate-resources` phase in the `ike-bom` stub module.
+During a normal reactor build:
+
+. `ike-parent` builds first (it is earlier in the reactor order).
+. `ike-bom` reaches `generate-resources`.
+. `ike:generate-bom` reads `ike-parent` resolved model from the reactor.
+. All managed dependencies are extracted with property references resolved.
+. A standalone POM is written that replaces the stub for `install`/`deploy`.
+
+The BOM is entirely derived from `ike-parent`.
+Adding a new managed dependency to `ike-parent`
+automatically includes it in the next BOM build.
+Zero manual maintenance, zero risk of drift.
+
+External consumers import the BOM for version alignment:
+
+[source,xml]
+----
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>network.ike</groupId>
+            <artifactId>ike-bom</artifactId>
+            <version>24</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+----
+
+== Summary
+
+The IKE Workspace convention is not a single tool or script.
+It is a _system_ of layered defenses —
+directory isolation,
+build-time artifact isolation,
+version identity,
+and file synchronization —
+designed so that no single failure compromises build safety
+or artifact provenance.
+
+It leans into Maven 4's capabilities rather than carrying forward
+workarounds designed for Maven 3's limitations.
+It prioritizes developer comprehension over pipeline convenience.
+And it keeps every checkout self-describing:
+the POM says what the artifact is,
+Git says where it came from,
+and the build reproduces it faithfully.

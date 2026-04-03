@@ -3,15 +3,15 @@
 ## Goal Hierarchy
 
 ```
-ike:ws-checkpoint            — workspace orchestrator (user-facing)
-ike:ws-checkpoint-dry-run    — dry-run wrapper for ws-checkpoint (user-facing)
+ws:checkpoint                — workspace orchestrator (user-facing)
+ws:checkpoint-dry-run        — dry-run wrapper for ws:checkpoint (user-facing)
 ike:checkpoint               — per-component engine (primarily internal)
 ike:checkpoint-dry-run       — dry-run wrapper for checkpoint (user-facing)
 ```
 
 ## How It Works
 
-`ike:ws-checkpoint` iterates workspace components in **topological order**
+`ws:checkpoint` iterates workspace components in **topological order**
 (dependencies before dependents) and invokes `ike:checkpoint` in each
 component's directory. Each component is independently built, tagged, and
 deployed to Nexus. After all components succeed, a YAML file recording the
@@ -60,7 +60,7 @@ checkpoint:
 
 - **`ike:checkpoint` visibility**: Currently user-facing but primarily
   intended as the per-component engine. Consider whether to hide it from
-  `ike:help` output in a future release.
+  help output in a future release.
 
 - **Selective component checkpointing**: Add `-Dcomponents=tinkar-core,komet`
   to checkpoint a subset of components (useful for hotfixes).

@@ -37,8 +37,8 @@ import java.util.List;
  * </ul>
  *
  * <pre>{@code
- * mvn ike:ws-upgrade              # apply all upgrades
- * mvn ike:ws-upgrade -DdryRun     # preview what would change
+ * mvn ws:upgrade              # apply all upgrades
+ * mvn ws:upgrade -DdryRun     # preview what would change
  * }</pre>
  *
  * @see WsCreateMojo for creating a new workspace

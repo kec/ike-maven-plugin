@@ -32,10 +32,10 @@ import java.util.regex.Pattern;
  * {@code tinkar-core}.
  *
  * <pre>{@code
- * mvn ike:ws-add -Drepo=https://github.com/ikmdev/tinkar-core.git
- * mvn ike:ws-add -Drepo=https://github.com/ikmdev/rocks-kb.git \
+ * mvn ws:add -Drepo=https://github.com/ikmdev/tinkar-core.git
+ * mvn ws:add -Drepo=https://github.com/ikmdev/rocks-kb.git \
  *     -DdependsOn=tinkar-core
- * mvn ike:ws-add -Drepo=https://github.com/ikmdev/komet.git \
+ * mvn ws:add -Drepo=https://github.com/ikmdev/komet.git \
  *     -DdependsOn=tinkar-core,rocks-kb -Dtype=software
  * }</pre>
  *
@@ -111,7 +111,7 @@ public class WsAddMojo extends AbstractMojo {
         if (!Files.exists(manifestPath)) {
             throw new MojoExecutionException(
                     "No workspace.yaml found in " + wsDir
-                    + ". Run ike:ws-create first.");
+                    + ". Run ws:create first.");
         }
 
         // Derive component name from URL if not specified
@@ -158,7 +158,7 @@ public class WsAddMojo extends AbstractMojo {
         }
 
         getLog().info("");
-        getLog().info("  Component added. Run 'mvn ike:init' to clone.");
+        getLog().info("  Component added. Run 'mvn ws:init' to clone.");
         getLog().info("");
     }
 
@@ -309,6 +309,6 @@ public class WsAddMojo extends AbstractMojo {
         }
         throw new MojoExecutionException(
                 "Cannot find workspace.yaml. Run from within a workspace "
-                + "directory or use ike:ws-create first.");
+                + "directory or use ws:create first.");
     }
 }

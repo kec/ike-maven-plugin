@@ -20,7 +20,7 @@ import java.util.Optional;
  * <p>In workspace mode, syncs the workspace repo first, then each
  * component that has a state file.
  *
- * <p>Usage: {@code mvnw ike:sync}
+ * <p>Usage: {@code mvnw ws:vcs-sync}
  */
 @Mojo(name = "vcs-sync", requiresProject = false, threadSafe = true)
 public class SyncMojo extends AbstractWorkspaceMojo {

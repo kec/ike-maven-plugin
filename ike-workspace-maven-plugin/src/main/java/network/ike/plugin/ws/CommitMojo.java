@@ -15,7 +15,7 @@ import java.io.File;
  * Sets {@code IKE_VCS_CONTEXT} so the pre-commit hook allows the
  * operation through without a state file check.
  *
- * <p>Usage: {@code mvnw ike:commit -Dmessage="my commit message"}
+ * <p>Usage: {@code mvnw ws:commit -Dmessage="my commit message"}
  */
 @Mojo(name = "commit", requiresProject = false, threadSafe = true)
 public class CommitMojo extends AbstractWorkspaceMojo {

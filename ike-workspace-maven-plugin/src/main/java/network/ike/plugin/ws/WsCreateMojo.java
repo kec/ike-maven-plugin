@@ -30,12 +30,12 @@ import java.time.LocalDate;
  *   <li>.mvn/maven.config sets {@code -T 1C}</li>
  * </ul>
  *
- * <p>After creation, use {@code ike:ws-add} to add component repos,
- * then {@code ike:init} to clone them.
+ * <p>After creation, use {@code ws:add} to add component repos,
+ * then {@code ws:init} to clone them.
  *
  * <pre>{@code
- * mvn ike:ws-create -Dname=my-workspace
- * mvn ike:ws-create -Dname=my-workspace -Dorg=knowledge-graphlet
+ * mvn ws:create -Dname=my-workspace
+ * mvn ws:create -Dname=my-workspace -Dorg=knowledge-graphlet
  * }</pre>
  *
  * @see WsAddMojo for adding components to an existing workspace
@@ -144,8 +144,8 @@ public class WsCreateMojo extends AbstractMojo {
         getLog().info("");
         getLog().info("  Next steps:");
         getLog().info("    cd " + name);
-        getLog().info("    mvn ike:ws-add -Drepo=<git-url>    # add components");
-        getLog().info("    mvn ike:init                        # clone components");
+        getLog().info("    mvn ws:add -Drepo=<git-url>    # add components");
+        getLog().info("    mvn ws:init                        # clone components");
         getLog().info("");
     }
 
@@ -166,9 +166,9 @@ public class WsCreateMojo extends AbstractMojo {
         xml.append("\n");
         xml.append("  Usage:\n");
         xml.append("    mvn clean install                        # All cloned repos\n");
-        xml.append("    mvn ike:init                             # Clone all repos\n");
-        xml.append("    mvn ike:status                           # Git status across repos\n");
-        xml.append("    mvn ike:dashboard                        # Full workspace overview\n");
+        xml.append("    mvn ws:init                              # Clone all repos\n");
+        xml.append("    mvn ws:status                            # Git status across repos\n");
+        xml.append("    mvn ws:dashboard                         # Full workspace overview\n");
         xml.append("-->\n");
         xml.append("<project xmlns=\"http://maven.apache.org/POM/4.1.0\"\n");
         xml.append("         xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n");
@@ -193,7 +193,7 @@ public class WsCreateMojo extends AbstractMojo {
         xml.append("            </plugin>\n");
         xml.append("        </plugins>\n");
         xml.append("    </build>\n\n");
-        xml.append("    <!-- Profiles are added by ike:ws-add -->\n");
+        xml.append("    <!-- Profiles are added by ws:add -->\n");
         xml.append("    <profiles>\n");
         xml.append("    </profiles>\n\n");
         xml.append("</project>\n");
@@ -213,7 +213,7 @@ public class WsCreateMojo extends AbstractMojo {
         yaml.append("# Bootstrap:\n");
         yaml.append("#   git clone https://github.com/").append(orgName).append("/").append(name).append(".git\n");
         yaml.append("#   cd ").append(name).append("\n");
-        yaml.append("#   mvn ike:init\n");
+        yaml.append("#   mvn ws:init\n");
         yaml.append("#   mvn clean install\n\n");
         yaml.append("schema-version: \"1.0\"\n");
         yaml.append("generated: ").append(today).append("\n\n");
@@ -226,7 +226,7 @@ public class WsCreateMojo extends AbstractMojo {
         yaml.append("    build-command: \"mvn clean install\"\n");
         yaml.append("    checkpoint-mechanism: git-tag\n\n");
         yaml.append("components:\n");
-        yaml.append("  # Add components with: mvn ike:ws-add -Drepo=<git-url>\n\n");
+        yaml.append("  # Add components with: mvn ws:add -Drepo=<git-url>\n\n");
         yaml.append("groups:\n");
         yaml.append("  all: []\n");
         return yaml.toString();
@@ -238,7 +238,7 @@ public class WsCreateMojo extends AbstractMojo {
         gi.append("# ").append("═".repeat(name.length() + 11)).append("\n");
         gi.append("#\n");
         gi.append("# Ignore everything, whitelist only workspace-owned files.\n");
-        gi.append("# Component repos are independent git repos cloned by ike:init.\n\n");
+        gi.append("# Component repos are independent git repos cloned by ws:init.\n\n");
         gi.append("# ── Ignore everything by default ─────────────────────────────────\n");
         gi.append("*\n\n");
         gi.append("# ── Whitelist workspace-level files ──────────────────────────────\n");
@@ -272,21 +272,21 @@ public class WsCreateMojo extends AbstractMojo {
         adoc.append("----\n");
         adoc.append("git clone https://github.com/").append(orgName).append("/").append(name).append(".git\n");
         adoc.append("cd ").append(name).append("\n");
-        adoc.append("mvn ike:init        # <1>\n");
+        adoc.append("mvn ws:init         # <1>\n");
         adoc.append("mvn clean install   # <2>\n");
         adoc.append("----\n");
         adoc.append("<1> Clones all component repos in dependency order; installs Maven\n");
         adoc.append("    wrapper and JVM config per component.\n");
         adoc.append("<2> Builds the full stack.\n\n");
         adoc.append("== Workspace Commands\n\n");
-        adoc.append("All `ike:` goals appear in the IntelliJ Maven tool window\n");
-        adoc.append("(under _Plugins > ike_). Double-click any goal to run it.\n\n");
+        adoc.append("All `ws:` goals appear in the IntelliJ Maven tool window\n");
+        adoc.append("(under _Plugins > ws_). Double-click any goal to run it.\n\n");
         adoc.append("[source,bash]\n");
         adoc.append("----\n");
-        adoc.append("mvn ike:status          # Git status across components\n");
-        adoc.append("mvn ike:dashboard       # Full workspace health check\n");
-        adoc.append("mvn ike:ws-add -Drepo=  # Add a component repo\n");
-        adoc.append("mvn ike:ws-upgrade      # Upgrade workspace conventions\n");
+        adoc.append("mvn ws:status           # Git status across components\n");
+        adoc.append("mvn ws:dashboard        # Full workspace health check\n");
+        adoc.append("mvn ws:add -Drepo=      # Add a component repo\n");
+        adoc.append("mvn ws:upgrade          # Upgrade workspace conventions\n");
         adoc.append("----\n");
         return adoc.toString();
     }
@@ -314,7 +314,7 @@ public class WsCreateMojo extends AbstractMojo {
         Path wrapperDir = wsDir.resolve(".mvn").resolve("wrapper");
         Files.createDirectories(wrapperDir);
 
-        String props = "# Maven Wrapper properties — managed by ike:init from workspace.yaml\n"
+        String props = "# Maven Wrapper properties — managed by ws:init from workspace.yaml\n"
                 + "maven.version=" + mavenVersion + "\n"
                 + "distributionUrl=https://repo.maven.apache.org/maven2/org/apache/maven/"
                 + "apache-maven/" + mavenVersion + "/apache-maven-" + mavenVersion
@@ -325,7 +325,7 @@ public class WsCreateMojo extends AbstractMojo {
         Path mvnw = wsDir.resolve("mvnw");
         String script = """
                 #!/bin/sh
-                # Maven Wrapper launcher — installed by ike:init
+                # Maven Wrapper launcher — installed by ws:init
                 # Downloads and caches the Maven version specified in
                 # .mvn/wrapper/maven-wrapper.properties
                 #
@@ -363,7 +363,7 @@ public class WsCreateMojo extends AbstractMojo {
 
         Path mvnwCmd = wsDir.resolve("mvnw.cmd");
         String cmdScript = """
-                @REM Maven Wrapper launcher — installed by ike:init
+                @REM Maven Wrapper launcher — installed by ws:init
                 @REM Downloads and caches the Maven version specified in
                 @REM .mvn/wrapper/maven-wrapper.properties
                 @echo off

@@ -117,6 +117,30 @@
     <build>
         <pluginManagement>
             <plugins>
+                <!-- Unpack Claude standards from ike-build-standards (reactor sibling).
+                     Each module that declares the claude classifier dependency gets
+                     standards unpacked to .claude/standards/ at validate phase. -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>3.9.0</version>
+                    <executions>
+                        <execution>
+                            <id>unpack-claude-standards</id>
+                            <phase>validate</phase>
+                            <goals><goal>unpack-dependencies</goal></goals>
+                            <configuration>
+                                <includeArtifactIds>ike-build-standards</includeArtifactIds>
+                                <includeClassifiers>claude</includeClassifiers>
+                                <includeTypes>zip</includeTypes>
+                                <outputDirectory>${project.basedir}/.claude/standards</outputDirectory>
+                                <overWriteReleases>true</overWriteReleases>
+                                <overWriteSnapshots>true</overWriteSnapshots>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+
                 <!-- Pin ike-maven-plugin to reactor version so mvn ike:release
                      always uses the current SNAPSHOT (self-release pattern). -->
                 <plugin>
@@ -219,6 +243,10 @@
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+            </plugin>
             <plugin><artifactId>maven-compiler-plugin</artifactId></plugin>
             <plugin><artifactId>maven-surefire-plugin</artifactId></plugin>
             <plugin>
@@ -320,6 +348,7 @@
     </profiles>
 
     <subprojects>
+        <subproject>ike-build-standards</subproject>
         <subproject>ike-workspace-model</subproject>
         <subproject>ike-maven-plugin</subproject>
         <subproject>ike-workspace-maven-plugin</subproject>

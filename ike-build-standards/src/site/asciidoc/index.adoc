@@ -1,0 +1,42 @@
+= IKE Build Standards
+
+Versioned instruction files for AI-assisted development across
+IKE Community projects.
+Distributed as classified Maven artifacts and unpacked at build
+time into each consuming project's `.claude/standards/` directory.
+
+== Standard Files
+
+[cols="2,4",options="header"]
+|===
+| File | Scope
+
+| `MAVEN.md`
+| Maven 4 build standards: POM model 4.1.0 conventions,
+  property naming, profile structure, lifecycle phases
+
+| `IKE-MAVEN.md`
+| IKE-specific Maven conventions: parent architecture,
+  doc-pipeline profile, artifact distribution, property-driven builds
+
+| `JAVA.md`
+| Java 25 standards: preview features, pattern matching,
+  records, sealed classes, virtual threads
+
+| `IKE-JAVA.md`
+| IKE-specific Java patterns: RocksDB usage, gRPC conventions,
+  Koncept extension development
+|===
+
+== Distribution
+
+Standards are packaged as classified ZIP artifacts and unpacked
+by `maven-dependency-plugin` during the `validate` phase.
+This ensures every IKE project uses the same version of
+standards without committing instruction files to each repository.
+
+== Versioning
+
+Standards follow the unified pipeline version.
+When standards evolve,
+all consuming projects pick up the changes on their next build.

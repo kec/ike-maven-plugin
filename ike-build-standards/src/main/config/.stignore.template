@@ -1,0 +1,33 @@
+// IKE Workspace — Syncthing ignore patterns
+// Copy this file to ~/Projects/ike/.stignore
+//
+// Syncthing synchronizes the working tree between machines.
+// Git state, build output, and IDE configuration are excluded.
+// Each machine maintains its own independent Git history,
+// Maven local repository, and IDE state.
+
+// Git — each machine has independent history
+**/.git/
+
+// Maven build output
+**/target/
+
+// Maven 4 project-local installed artifact repository
+**/.mvn/local-repo/
+
+// IDE state — per-machine
+**/.idea/
+**/*.iml
+**/.vscode/
+**/.settings/
+**/.classpath
+**/.project
+
+// macOS artifacts
+**/.DS_Store
+
+// Data stores — rebuilt locally
+**/*.rocksdb/
+
+// Node (if present)
+**/node_modules/
