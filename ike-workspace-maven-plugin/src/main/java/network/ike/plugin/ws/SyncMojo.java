@@ -25,6 +25,9 @@ import java.util.Optional;
 @Mojo(name = "vcs-sync", requiresProject = false, threadSafe = true)
 public class SyncMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public SyncMojo() {}
+
     @Override
     public void execute() throws MojoExecutionException {
         getLog().info("");

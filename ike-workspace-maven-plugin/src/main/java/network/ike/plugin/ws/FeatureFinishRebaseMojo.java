@@ -41,6 +41,9 @@ import java.util.List;
 @Mojo(name = "feature-finish-rebase", requiresProject = false, threadSafe = true)
 public class FeatureFinishRebaseMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public FeatureFinishRebaseMojo() {}
+
     @Parameter(property = "feature")
     String feature;
 

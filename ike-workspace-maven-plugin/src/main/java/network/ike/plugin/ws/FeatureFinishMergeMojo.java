@@ -38,6 +38,9 @@ import java.util.List;
 @Mojo(name = "feature-finish-merge", requiresProject = false, threadSafe = true)
 public class FeatureFinishMergeMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public FeatureFinishMergeMojo() {}
+
     @Parameter(property = "feature")
     String feature;
 

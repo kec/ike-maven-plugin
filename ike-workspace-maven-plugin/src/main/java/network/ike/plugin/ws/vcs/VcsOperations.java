@@ -31,6 +31,10 @@ public class VcsOperations {
 
     /**
      * Get the 8-character short SHA of HEAD.
+     *
+     * @param dir the repository root directory
+     * @return the short SHA string
+     * @throws MojoExecutionException if the git command fails
      */
     public static String headSha(File dir) throws MojoExecutionException {
         return capture(dir, "git", "rev-parse", "--short=8", "HEAD");
@@ -38,6 +42,10 @@ public class VcsOperations {
 
     /**
      * Get the current branch name.
+     *
+     * @param dir the repository root directory
+     * @return the current branch name
+     * @throws MojoExecutionException if the git command fails
      */
     public static String currentBranch(File dir) throws MojoExecutionException {
         return capture(dir, "git", "branch", "--show-current");
@@ -45,6 +53,12 @@ public class VcsOperations {
 
     /**
      * Get the 8-character short SHA of a remote branch, or empty if unreachable.
+     *
+     * @param dir    the repository root directory
+     * @param remote the remote name (e.g., "origin")
+     * @param branch the branch name to query
+     * @return the short SHA, or empty if the remote branch is unreachable
+     * @throws MojoExecutionException if the git command fails
      */
     public static Optional<String> remoteSha(File dir, String remote, String branch)
             throws MojoExecutionException {
@@ -63,6 +77,9 @@ public class VcsOperations {
 
     /**
      * Check whether the working tree is clean (no staged or unstaged changes).
+     *
+     * @param dir the repository root directory
+     * @return true if the working tree has no changes
      */
     public static boolean isClean(File dir) {
         try {
@@ -77,6 +94,10 @@ public class VcsOperations {
 
     /**
      * Fetch from all remotes.
+     *
+     * @param dir the repository root directory
+     * @param log Maven logger
+     * @throws MojoExecutionException if the git command fails
      */
     public static void fetch(File dir, Log log) throws MojoExecutionException {
         run(dir, log, null, "git", "fetch", "--all", "--quiet");
@@ -84,6 +105,11 @@ public class VcsOperations {
 
     /**
      * Soft reset (no --hard) — updates HEAD and index, leaves working tree.
+     *
+     * @param dir the repository root directory
+     * @param log Maven logger
+     * @param ref the ref to reset to (e.g., "origin/main")
+     * @throws MojoExecutionException if the git command fails
      */
     public static void resetSoft(File dir, Log log, String ref)
             throws MojoExecutionException {
@@ -92,6 +118,11 @@ public class VcsOperations {
 
     /**
      * Checkout an existing branch.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param branch the branch to check out
+     * @throws MojoExecutionException if the git command fails
      */
     public static void checkout(File dir, Log log, String branch)
             throws MojoExecutionException {
@@ -100,6 +131,11 @@ public class VcsOperations {
 
     /**
      * Create and checkout a new branch.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param branch the new branch name to create
+     * @throws MojoExecutionException if the git command fails
      */
     public static void checkoutNew(File dir, Log log, String branch)
             throws MojoExecutionException {
@@ -109,6 +145,11 @@ public class VcsOperations {
     /**
      * Stage all changes and commit with the given message.
      * Sets {@code IKE_VCS_CONTEXT} to bypass the pre-commit hook.
+     *
+     * @param dir     the repository root directory
+     * @param log     Maven logger
+     * @param message the commit message
+     * @throws MojoExecutionException if the git command fails
      */
     public static void commit(File dir, Log log, String message)
             throws MojoExecutionException {
@@ -118,6 +159,11 @@ public class VcsOperations {
     /**
      * Commit without staging (assumes files are already staged).
      * Sets {@code IKE_VCS_CONTEXT} to bypass the pre-commit hook.
+     *
+     * @param dir     the repository root directory
+     * @param log     Maven logger
+     * @param message the commit message, or {@code null} to open the editor
+     * @throws MojoExecutionException if the git command fails
      */
     public static void commitStaged(File dir, Log log, String message)
             throws MojoExecutionException {
@@ -126,6 +172,10 @@ public class VcsOperations {
 
     /**
      * Stage all files.
+     *
+     * @param dir the repository root directory
+     * @param log Maven logger
+     * @throws MojoExecutionException if the git command fails
      */
     public static void addAll(File dir, Log log) throws MojoExecutionException {
         run(dir, log, null, "git", "add", "-A");
@@ -133,6 +183,12 @@ public class VcsOperations {
 
     /**
      * Push to remote. Sets {@code IKE_VCS_CONTEXT} to bypass the pre-push hook.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param remote the remote name (e.g., "origin")
+     * @param branch the branch to push
+     * @throws MojoExecutionException if the git command fails
      */
     public static void push(File dir, Log log, String remote, String branch)
             throws MojoExecutionException {
@@ -142,6 +198,11 @@ public class VcsOperations {
     /**
      * Push to remote, ignoring failures (no remote, offline, etc.).
      * Logs a warning on failure instead of throwing.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param remote the remote name (e.g., "origin")
+     * @param branch the branch to push
      */
     public static void pushSafe(File dir, Log log, String remote, String branch) {
         try {
@@ -154,6 +215,12 @@ public class VcsOperations {
     /**
      * Push to remote with upstream tracking.
      * Sets {@code IKE_VCS_CONTEXT} to bypass the pre-push hook.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param remote the remote name (e.g., "origin")
+     * @param branch the branch to push
+     * @throws MojoExecutionException if the git command fails
      */
     public static void pushWithUpstream(File dir, Log log, String remote, String branch)
             throws MojoExecutionException {
@@ -163,6 +230,11 @@ public class VcsOperations {
     /**
      * Delete a local branch. Uses {@code -D} (force) because squash-merged
      * branches are not recognized as "fully merged" by git.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param branch the branch to delete
+     * @throws MojoExecutionException if the git command fails
      */
     public static void deleteBranch(File dir, Log log, String branch)
             throws MojoExecutionException {
@@ -171,6 +243,12 @@ public class VcsOperations {
 
     /**
      * Delete a remote branch.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param remote the remote name (e.g., "origin")
+     * @param branch the branch to delete on the remote
+     * @throws MojoExecutionException if the git command fails
      */
     public static void deleteRemoteBranch(File dir, Log log, String remote, String branch)
             throws MojoExecutionException {
@@ -179,6 +257,11 @@ public class VcsOperations {
 
     /**
      * Squash-merge a branch into the current branch (does not commit).
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param branch the branch to squash-merge
+     * @throws MojoExecutionException if the git command fails
      */
     public static void mergeSquash(File dir, Log log, String branch)
             throws MojoExecutionException {
@@ -187,6 +270,12 @@ public class VcsOperations {
 
     /**
      * No-fast-forward merge with a merge commit.
+     *
+     * @param dir     the repository root directory
+     * @param log     Maven logger
+     * @param branch  the branch to merge
+     * @param message the merge commit message
+     * @throws MojoExecutionException if the git command fails
      */
     public static void mergeNoFf(File dir, Log log, String branch, String message)
             throws MojoExecutionException {

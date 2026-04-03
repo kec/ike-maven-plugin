@@ -45,6 +45,9 @@ import java.nio.file.Path;
 @Mojo(name = "adocstudio", requiresProject = false, threadSafe = true)
 public class AdocStudioMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public AdocStudioMojo() {}
+
     private static final String SWIFT_RESOURCE =
             "/adocstudio/bootstrap-adocprojects.swift";
 

@@ -20,6 +20,9 @@ import java.io.File;
 @Mojo(name = "push", requiresProject = false, threadSafe = true)
 public class PushMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public PushMojo() {}
+
     /**
      * Remote name to push to.
      */

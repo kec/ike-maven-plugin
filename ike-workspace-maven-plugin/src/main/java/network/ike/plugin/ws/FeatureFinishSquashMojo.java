@@ -41,6 +41,9 @@ import java.util.List;
 @Mojo(name = "feature-finish-squash", requiresProject = false, threadSafe = true)
 public class FeatureFinishSquashMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public FeatureFinishSquashMojo() {}
+
     /** Feature name. Expects branch {@code feature/<name>}. Prompted if omitted. */
     @Parameter(property = "feature")
     String feature;

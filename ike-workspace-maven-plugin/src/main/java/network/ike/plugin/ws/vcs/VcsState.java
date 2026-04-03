@@ -18,6 +18,12 @@ import java.io.StringReader;
  *
  * <p>Format is a plain properties file — trivial to parse in both bash
  * (grep/cut) and Java (Properties.load).
+ *
+ * @param timestamp UTC timestamp of the action
+ * @param machine   short hostname of the machine that performed the action
+ * @param branch    the branch name at the time of the action
+ * @param sha       the 8-character short SHA at the time of the action
+ * @param action    the action performed (e.g., {@link #ACTION_COMMIT})
  */
 public record VcsState(
         String timestamp,

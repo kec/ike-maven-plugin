@@ -37,6 +37,11 @@ public class ReleaseSupport {
     /**
      * Run a command, inherit IO so output streams to the Maven console.
      * Throws on non-zero exit code.
+     *
+     * @param workDir working directory for the subprocess
+     * @param log     Maven logger for output routing
+     * @param command the command and arguments to execute
+     * @throws MojoExecutionException if the command exits non-zero or cannot be started
      */
     public static void exec(File workDir, Log log, String... command)
             throws MojoExecutionException {
@@ -107,7 +112,12 @@ public class ReleaseSupport {
         }
     }
 
-    /** A command paired with a display label for parallel execution. */
+    /**
+     * A command paired with a display label for parallel execution.
+     *
+     * @param label   human-readable name shown in log output
+     * @param command the command and arguments to execute
+     */
     public record LabeledTask(String label, String[] command) {}
 
     /**
@@ -117,6 +127,11 @@ public class ReleaseSupport {
      * <p>Spawns virtual threads to read stdout/stderr from each process.
      * All processes run to completion even if one fails — the exception
      * reports which task(s) failed.
+     *
+     * @param workDir working directory for each subprocess
+     * @param log     Maven logger for output routing
+     * @param tasks   the labeled tasks to run concurrently
+     * @throws MojoExecutionException if any task fails or execution is interrupted
      */
     public static void execParallel(File workDir, Log log, LabeledTask... tasks)
             throws MojoExecutionException {
@@ -177,6 +192,11 @@ public class ReleaseSupport {
     /**
      * Run a command and capture stdout as a trimmed String.
      * Throws on non-zero exit code.
+     *
+     * @param workDir working directory for the subprocess
+     * @param command the command and arguments to execute
+     * @return trimmed stdout output
+     * @throws MojoExecutionException if the command exits non-zero or cannot be started
      */
     public static String execCapture(File workDir, String... command)
             throws MojoExecutionException {
@@ -207,6 +227,10 @@ public class ReleaseSupport {
     /**
      * Read the project's own {@code <version>} from a POM file,
      * skipping any {@code <version>} inside the {@code <parent>} block.
+     *
+     * @param pomFile the POM file to read
+     * @return the version string
+     * @throws MojoExecutionException if the file cannot be read or has no version
      */
     public static String readPomVersion(File pomFile) throws MojoExecutionException {
         try {
@@ -237,6 +261,7 @@ public class ReleaseSupport {
      * @param pomFile      the root POM to update
      * @param newTimestamp ISO-8601 UTC timestamp, e.g. {@code 2026-03-30T12:00:00Z}
      * @param log          Maven log (used for warnings only)
+     * @throws MojoExecutionException if the file cannot be read or written
      */
     public static void stampOutputTimestamp(File pomFile, String newTimestamp, Log log)
             throws MojoExecutionException {
@@ -262,6 +287,11 @@ public class ReleaseSupport {
      * Replace the project's own {@code <version>old</version>} with
      * {@code <version>new</version>}, skipping any version inside
      * the {@code <parent>} block.
+     *
+     * @param pomFile    the POM file to update
+     * @param oldVersion the current version string to replace
+     * @param newVersion the new version string
+     * @throws MojoExecutionException if the version is not found or the file cannot be updated
      */
     public static void setPomVersion(File pomFile, String oldVersion, String newVersion)
             throws MojoExecutionException {
@@ -295,6 +325,11 @@ public class ReleaseSupport {
      * Resolve the Maven executable. Prefers the Maven wrapper
      * ({@code mvnw}) at the git root; falls back to {@code mvn}
      * from the system PATH (resolved via {@code which}).
+     *
+     * @param gitRoot the git repository root directory
+     * @param log     Maven logger
+     * @return the resolved Maven executable
+     * @throws MojoExecutionException if neither wrapper nor system Maven is found
      */
     public static File resolveMavenWrapper(File gitRoot, Log log) throws MojoExecutionException {
         String name = System.getProperty("os.name", "")
@@ -318,6 +353,10 @@ public class ReleaseSupport {
 
     /**
      * Get the git repository root directory.
+     *
+     * @param startDir any directory inside the repository
+     * @return the repository root directory
+     * @throws MojoExecutionException if git rev-parse fails
      */
     public static File gitRoot(File startDir) throws MojoExecutionException {
         String root = execCapture(startDir,
@@ -327,6 +366,9 @@ public class ReleaseSupport {
 
     /**
      * Assert that the git working tree is clean (no staged or unstaged changes).
+     *
+     * @param workDir any directory inside the repository
+     * @throws MojoExecutionException if the working tree has uncommitted changes
      */
     public static void requireCleanWorktree(File workDir) throws MojoExecutionException {
         try {
@@ -345,6 +387,10 @@ public class ReleaseSupport {
 
     /**
      * Get the current git branch name.
+     *
+     * @param workDir any directory inside the repository
+     * @return the current branch name
+     * @throws MojoExecutionException if git rev-parse fails
      */
     public static String currentBranch(File workDir) throws MojoExecutionException {
         return execCapture(workDir, "git", "rev-parse", "--abbrev-ref", "HEAD");
@@ -352,6 +398,10 @@ public class ReleaseSupport {
 
     /**
      * Check whether a named git remote exists.
+     *
+     * @param workDir    any directory inside the repository
+     * @param remoteName the remote name to check (e.g., "origin")
+     * @return {@code true} if the remote exists
      */
     public static boolean hasRemote(File workDir, String remoteName) {
         try {
@@ -366,6 +416,9 @@ public class ReleaseSupport {
      * Derive the release version from a SNAPSHOT version.
      * {@code "2-SNAPSHOT"} becomes {@code "2"};
      * {@code "1.1.0-SNAPSHOT"} becomes {@code "1.1.0"}.
+     *
+     * @param snapshotVersion the SNAPSHOT version string
+     * @return the release version without the -SNAPSHOT suffix
      */
     public static String deriveReleaseVersion(String snapshotVersion) {
         return snapshotVersion.replace("-SNAPSHOT", "");
@@ -375,6 +428,9 @@ public class ReleaseSupport {
      * Derive the next SNAPSHOT version by incrementing the last numeric
      * segment. {@code "2"} becomes {@code "3-SNAPSHOT"};
      * {@code "1.1.0"} becomes {@code "1.1.1-SNAPSHOT"}.
+     *
+     * @param releaseVersion the release version to increment
+     * @return the next SNAPSHOT version
      */
     public static String deriveNextSnapshot(String releaseVersion) {
         String base = releaseVersion.replace("-SNAPSHOT", "");
@@ -413,6 +469,10 @@ public class ReleaseSupport {
     /**
      * Find all {@code pom.xml} files under the git root, excluding
      * {@code target/} directories and the {@code .mvn/} directory.
+     *
+     * @param gitRoot the git repository root directory
+     * @return list of discovered POM files
+     * @throws MojoExecutionException if the file tree cannot be walked
      */
     public static List<File> findPomFiles(File gitRoot) throws MojoExecutionException {
         try (Stream<Path> walk = Files.walk(gitRoot.toPath())) {
@@ -436,7 +496,11 @@ public class ReleaseSupport {
      * Before replacing, each affected file is saved as
      * {@code pom.xml.ike-backup} so it can be restored later.
      *
+     * @param gitRoot the git repository root directory
+     * @param version the literal version to substitute
+     * @param log     Maven logger
      * @return the list of POM files that were modified
+     * @throws MojoExecutionException if a file cannot be read or written
      */
     public static List<File> replaceProjectVersionRefs(File gitRoot, String version,
                                                  Log log)
@@ -475,7 +539,10 @@ public class ReleaseSupport {
      * delete the backup files. This reverses
      * {@link #replaceProjectVersionRefs}.
      *
+     * @param gitRoot the git repository root directory
+     * @param log     Maven logger
      * @return the list of POM files that were restored
+     * @throws MojoExecutionException if a backup cannot be restored
      */
     public static List<File> restoreBackups(File gitRoot, Log log)
             throws MojoExecutionException {
@@ -504,6 +571,11 @@ public class ReleaseSupport {
 
     /**
      * Stage a list of files with {@code git add}.
+     *
+     * @param gitRoot the git repository root directory
+     * @param log     Maven logger
+     * @param files   the files to stage
+     * @throws MojoExecutionException if the git add command fails
      */
     public static void gitAddFiles(File gitRoot, Log log, List<File> files)
             throws MojoExecutionException {
@@ -533,6 +605,8 @@ public class ReleaseSupport {
      *
      * @param pomVersion current POM version (may include -SNAPSHOT)
      * @param gitRoot    git repository root (for HEAD SHA lookup)
+     * @return the checkpoint version string
+     * @throws MojoExecutionException if the HEAD SHA cannot be resolved
      */
     public static String deriveCheckpointVersion(String pomVersion, File gitRoot)
             throws MojoExecutionException {
@@ -544,6 +618,10 @@ public class ReleaseSupport {
 
     /**
      * Check whether a git tag exists (locally).
+     *
+     * @param gitRoot the git repository root directory
+     * @param tagName the tag name to check
+     * @return {@code true} if the tag exists locally
      */
     public static boolean tagExists(File gitRoot, String tagName) {
         try {
@@ -584,8 +662,12 @@ public class ReleaseSupport {
      * Overload accepting an explicit SSH command prefix — package-private
      * for testing against containers.
      *
-     * @param sshPrefix the SSH command tokens (e.g., "ssh", "-i", "key",
-     *                  "-p", "2222", "user@localhost")
+     * @param workDir    local directory for process execution
+     * @param log        Maven log
+     * @param remotePath absolute path on the server to remove
+     * @param sshPrefix  the SSH command tokens (e.g., "ssh", "-i", "key",
+     *                   "-p", "2222", "user@localhost")
+     * @throws MojoExecutionException if the path is unsafe or SSH fails
      */
     public static void cleanRemoteSiteDir(File workDir, Log log, String remotePath,
                                     String... sshPrefix)

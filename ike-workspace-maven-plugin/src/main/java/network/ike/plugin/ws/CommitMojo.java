@@ -20,6 +20,9 @@ import java.io.File;
 @Mojo(name = "commit", requiresProject = false, threadSafe = true)
 public class CommitMojo extends AbstractWorkspaceMojo {
 
+    /** Creates this goal instance. */
+    public CommitMojo() {}
+
     /**
      * Commit message. If omitted, git opens the editor and the
      * prepare-commit-msg hook generates a message via Claude.
