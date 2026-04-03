@@ -73,13 +73,13 @@
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-maven-plugin</artifactId>
-            <version>53</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Workspace model library -->
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-workspace-model</artifactId>
-            <version>53</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Maven plugin API -->
         <dependency>

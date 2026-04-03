@@ -81,7 +81,7 @@
         <dependency>
             <groupId>network.ike</groupId>
             <artifactId>ike-workspace-model</artifactId>
-            <version>53</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
