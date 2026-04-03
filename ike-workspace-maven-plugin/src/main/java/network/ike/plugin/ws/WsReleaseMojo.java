@@ -363,6 +363,11 @@ public class WsReleaseMojo extends AbstractWorkspaceMojo {
 
     /**
      * Delegate to shared utility in {@link ReleaseSupport}.
+     *
+     * @param pomContent   the POM file content as a string
+     * @param propertyName the property element name to update
+     * @param newVersion   the new version value
+     * @return the updated POM content
      */
     public static String updateVersionProperty(String pomContent,
                                                 String propertyName,

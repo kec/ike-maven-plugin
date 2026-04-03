@@ -30,6 +30,9 @@ import java.util.Set;
 @Mojo(name = "setup", requiresProject = false, threadSafe = true)
 public class SetupMojo extends AbstractMojo {
 
+    /** Creates this goal instance. */
+    public SetupMojo() {}
+
     /** VCS bridge hook filenames — only these are written. */
     private static final List<String> VCS_HOOKS =
             List.of("pre-commit", "post-commit", "pre-push");

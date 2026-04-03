@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  * updated.
  *
  * <p>Property-based versions (e.g., {@code <ike-bom.version>}) are
- * updated via {@link ReleaseSupport#updateVersionProperty}. Direct
+ * updated via {@code ReleaseSupport.updateVersionProperty()}. Direct
  * {@code <version>} tags in dependency blocks are updated via text
  * replacement.
  *

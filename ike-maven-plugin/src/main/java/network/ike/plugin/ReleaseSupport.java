@@ -80,6 +80,13 @@ public class ReleaseSupport {
         routeSubprocessLine(log, line, "");
     }
 
+    /**
+     * Route a subprocess output line through Maven's logger with a prefix.
+     *
+     * @param log    Maven logger
+     * @param line   raw subprocess output line
+     * @param prefix string prepended to each routed line
+     */
     public static void routeSubprocessLine(Log log, String line, String prefix) {
         if (line.startsWith("[ERROR] ")) {
             log.error(prefix + line.substring(8));
@@ -100,6 +107,7 @@ public class ReleaseSupport {
         }
     }
 
+    /** A command paired with a display label for parallel execution. */
     public record LabeledTask(String label, String[] command) {}
 
     /**
@@ -620,8 +628,12 @@ public class ReleaseSupport {
      * Overload accepting an explicit SSH command prefix — package-private
      * for testing against containers.
      *
-     * @param sshPrefix the SSH command tokens (e.g., "ssh", "-i", "key",
-     *                  "-p", "2222", "user@localhost")
+     * @param workDir    local directory for process execution
+     * @param log        Maven log
+     * @param remotePath final target path on the server
+     * @param sshPrefix  the SSH command tokens (e.g., "ssh", "-i", "key",
+     *                   "-p", "2222", "user@localhost")
+     * @throws MojoExecutionException if the path is unsafe or SSH fails
      */
     public static void swapRemoteSiteDir(File workDir, Log log, String remotePath,
                                    String... sshPrefix)
@@ -642,6 +654,9 @@ public class ReleaseSupport {
 
     /**
      * Return the staging path for a site deploy (final path + ".staging").
+     *
+     * @param diskPath the final on-disk site path
+     * @return {@code diskPath} with {@code .staging} appended
      */
     public static String siteStagingPath(String diskPath) {
         return diskPath + ".staging";
@@ -649,6 +664,9 @@ public class ReleaseSupport {
 
     /**
      * Return the scpexe URL for the staging directory.
+     *
+     * @param targetUrl the final site URL
+     * @return {@code targetUrl} with {@code .staging} appended
      */
     public static String siteStagingUrl(String targetUrl) {
         return targetUrl + ".staging";
@@ -702,6 +720,9 @@ public class ReleaseSupport {
      * Convert a git branch name to a safe site path segment.
      * Replaces {@code /} with {@code /} (keeps hierarchy for
      * {@code feature/name} structure).
+     *
+     * @param branch git branch name
+     * @return sanitized path segment safe for use in URLs and file paths
      */
     public static String branchToSitePath(String branch) {
         // Keep forward slashes for directory structure (feature/name → feature/name)
@@ -715,6 +736,10 @@ public class ReleaseSupport {
     /**
      * Read the project's own {@code <artifactId>} from a POM file,
      * skipping any {@code <artifactId>} inside the {@code <parent>} block.
+     *
+     * @param pomFile the POM file to read
+     * @return the artifact ID string
+     * @throws MojoExecutionException if the file cannot be read or has no artifact ID
      */
     public static String readPomArtifactId(File pomFile) throws MojoExecutionException {
         try {

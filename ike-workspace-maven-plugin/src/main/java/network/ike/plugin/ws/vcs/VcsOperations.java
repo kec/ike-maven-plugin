@@ -195,6 +195,11 @@ public class VcsOperations {
 
     /**
      * Rebase current branch onto the given base.
+     *
+     * @param dir  the repository root directory
+     * @param log  Maven logger
+     * @param onto the branch or ref to rebase onto
+     * @throws MojoExecutionException if the git command fails
      */
     public static void rebase(File dir, Log log, String onto)
             throws MojoExecutionException {
@@ -203,6 +208,11 @@ public class VcsOperations {
 
     /**
      * Fast-forward-only merge.
+     *
+     * @param dir    the repository root directory
+     * @param log    Maven logger
+     * @param branch the branch to merge
+     * @throws MojoExecutionException if the git command fails
      */
     public static void mergeFfOnly(File dir, Log log, String branch)
             throws MojoExecutionException {
@@ -216,6 +226,7 @@ public class VcsOperations {
      *
      * @param dir    the repository root directory
      * @param action the action constant (e.g., {@link VcsState#ACTION_COMMIT})
+     * @throws MojoExecutionException if writing the state file fails
      */
     public static void writeVcsState(File dir, String action)
             throws MojoExecutionException {
@@ -235,6 +246,7 @@ public class VcsOperations {
      *
      * @param dir the repository root directory
      * @return true if in sync or if no state file exists, false if catch-up is needed
+     * @throws MojoExecutionException if reading git state fails
      */
     public static boolean needsSync(File dir) throws MojoExecutionException {
         Optional<VcsState> state = VcsState.readFrom(dir.toPath());
@@ -254,6 +266,7 @@ public class VcsOperations {
      * @param dir the repository root directory
      * @param log Maven logger
      * @return the resulting HEAD SHA after sync
+     * @throws MojoExecutionException if a git command or state file read fails
      */
     public static String sync(File dir, Log log) throws MojoExecutionException {
         Optional<VcsState> stateOpt = VcsState.readFrom(dir.toPath());
@@ -295,6 +308,7 @@ public class VcsOperations {
      *
      * @param dir the repository root directory
      * @param log Maven logger
+     * @throws MojoExecutionException if sync fails
      */
     public static void catchUp(File dir, Log log) throws MojoExecutionException {
         if (!VcsState.isIkeManaged(dir.toPath())) {
